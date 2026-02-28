@@ -4,6 +4,7 @@ interface StoryGenerationOptions {
   currentScene: string;
   playerChoices: string[];
   characterStates: Record<string, 'alive' | 'dead' | 'unknown'>;
+  fearLevel?: number;
   customPrompt?: string;
 }
 
@@ -19,58 +20,29 @@ interface GeneratedStory {
 export function useMistralAI() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const generateStory = useCallback(async (options: StoryGenerationOptions): Promise<GeneratedStory | null> => {
-    const apiKey = process.env.MISTRAL_API_KEY;
-    
-    if (!apiKey) {
-      setError('Mistral API key not configured');
-      return null;
-    }
-    
     setIsGenerating(true);
     setError(null);
-    
-    const systemPrompt = `You are the narrator of a horror game called "Frost" inspired by Until Dawn. 
-Generate short narrative text (2-3 sentences) and 2-3 choices for the player.
-The game is set on Blackwood Mountain where supernatural creatures (Wendigos) hunt the characters.
-Current scene: ${options.currentScene}
-Previous choices: ${options.playerChoices.join(', ') || 'None'}
-
-Respond in JSON format:
-{
-  "narratorText": "The narrative text here...",
-  "choices": [
-    { "id": "choice_1", "text": "Choice text here", "nextScene": "scene_id" }
-  ]
-}`;
 
     try {
-      const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      const response = await fetch('/api/generate-story', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'mistral-large-latest',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...(options.customPrompt ? [{ role: 'user', content: options.customPrompt }] : []),
-          ],
-          response_format: { type: 'json_object' },
-          temperature: 0.8,
+          currentScene: options.currentScene,
+          playerChoices: options.playerChoices,
+          characterStates: options.characterStates,
+          fearLevel: options.fearLevel ?? 0,
+          customPrompt: options.customPrompt,
         }),
       });
-      
+
       if (!response.ok) {
-        throw new Error(`Mistral API error: ${response.status}`);
+        throw new Error(`API error: ${response.status}`);
       }
-      
-      const data = await response.json();
-      const content = data.choices[0].message.content;
-      
-      return JSON.parse(content) as GeneratedStory;
+
+      return await response.json() as GeneratedStory;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate story';
       setError(message);
@@ -80,6 +52,6 @@ Respond in JSON format:
       setIsGenerating(false);
     }
   }, []);
-  
+
   return { generateStory, isGenerating, error };
 }

@@ -1,21 +1,43 @@
 'use client';
 
-'use client';
-import { Canvas } from '@react-three/fiber';
+import { useRef, useEffect } from 'react';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import { CameraShake } from '@react-three/drei';
+import * as THREE from 'three';
 import { useGameStore } from '@/lib/store';
 import EnvironmentManager from './EnvironmentManager';
 import CharacterGroup from './CharacterGroup';
 import Wendigo from './Wendigo';
 import { getScene } from '@/data/story';
 
+interface CameraControllerProps {
+  target: [number, number, number];
+  disabled: boolean;
+}
+
+function CameraController({ target, disabled }: CameraControllerProps) {
+  const { camera } = useThree();
+  const targetRef = useRef(new THREE.Vector3(...target));
+
+  useEffect(() => {
+    targetRef.current.set(target[0], target[1], target[2]);
+  }, [target]);
+
+  useFrame((_, delta) => {
+    if (disabled) return;
+    camera.position.lerp(targetRef.current, Math.min(1, delta * 2));
+  });
+
+  return null;
+}
+
 interface SceneProps {
   cameraPosition?: [number, number, number];
 }
 
 export default function GameScene({ cameraPosition = [0, 3, 10] }: SceneProps) {
-  const { currentScene, currentEnvironment, wendigoActive } = useGameStore();
+  const { currentScene, wendigoActive } = useGameStore();
   const sceneData = getScene(currentScene);
-
   const sceneCameraPosition = sceneData.cameraPosition || cameraPosition;
 
   return (
@@ -24,9 +46,22 @@ export default function GameScene({ cameraPosition = [0, 3, 10] }: SceneProps) {
       camera={{ position: sceneCameraPosition, fov: 60 }}
       className="w-full h-full"
     >
+      <CameraController target={sceneCameraPosition} disabled={wendigoActive} />
       <EnvironmentManager />
       <CharacterGroup />
       {wendigoActive && <Wendigo />}
+      {wendigoActive && (
+        <CameraShake
+          intensity={0.3}
+          decay={false}
+          maxYaw={0.02}
+          maxPitch={0.02}
+          maxRoll={0.01}
+          yawFrequency={0.8}
+          pitchFrequency={0.8}
+          rollFrequency={0.4}
+        />
+      )}
     </Canvas>
   );
 }

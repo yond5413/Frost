@@ -2,9 +2,7 @@
 
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Billboard } from '@react-three/drei';
 import * as THREE from 'three';
-
 import { getCharacter } from '@/data/characters';
 import { useGameStore } from '@/lib/store';
 
@@ -12,9 +10,6 @@ interface CharacterProps {
   characterId: string;
   initialPosition?: [number, number, number];
 }
-
-const CAPSULE_HEIGHT = 1.8;
-const CAPSULE_RADIUS = 0.3;
 
 function CharacterFace({ color }: { color: string }) {
   const faceTexture = useMemo(() => {
@@ -45,15 +40,14 @@ function CharacterFace({ color }: { color: string }) {
     ctx.arc(64, 75, 20, 0.1 * Math.PI, 0.9 * Math.PI);
     ctx.stroke();
 
-    const texture = new THREE.CanvasTexture(canvas);
-    return texture;
+    return new THREE.CanvasTexture(canvas);
   }, [color]);
 
   if (!faceTexture) return null;
 
   return (
-    <mesh>
-      <planeGeometry args={[0.5, 0.5]} />
+    <mesh position={[0, 0, 0.26]}>
+      <planeGeometry args={[0.42, 0.42]} />
       <meshBasicMaterial map={faceTexture} transparent />
     </mesh>
   );
@@ -62,7 +56,7 @@ function CharacterFace({ color }: { color: string }) {
 export default function Character({ characterId }: CharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
   const character = getCharacter(characterId);
-  
+
   const characterPositions = useGameStore((state) => state.characterPositions);
   const characterAnimations = useGameStore((state) => state.characterAnimations);
   const characterStates = useGameStore((state) => state.characterStates);
@@ -75,26 +69,20 @@ export default function Character({ characterId }: CharacterProps) {
 
   useFrame((_, delta) => {
     if (!groupRef.current) return;
-
     timeRef.current += delta;
 
-    let bobOffset = 0;
-    if (animation === 'walk') {
-      bobOffset = Math.sin(timeRef.current * 8) * 0.1;
-    } else {
-      bobOffset = Math.sin(timeRef.current * 2) * 0.05;
-    }
+    const bobOffset =
+      animation === 'walk'
+        ? Math.sin(timeRef.current * 8) * 0.1
+        : Math.sin(timeRef.current * 2) * 0.05;
 
-    groupRef.current.position.y = position.y + CAPSULE_HEIGHT / 2 + bobOffset;
+    groupRef.current.position.y = position.y + bobOffset;
 
     if (animation === 'walk') {
-      const targetX = position.x;
-      const targetZ = position.z;
-      const dx = targetX - groupRef.current.position.x;
-      const dz = targetZ - groupRef.current.position.z;
-      const distance = Math.sqrt(dx * dx + dz * dz);
-      
-      if (distance > 0.1) {
+      const dx = position.x - groupRef.current.position.x;
+      const dz = position.z - groupRef.current.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist > 0.1) {
         groupRef.current.position.x += dx * delta * 2;
         groupRef.current.position.z += dz * delta * 2;
       }
@@ -106,16 +94,49 @@ export default function Character({ characterId }: CharacterProps) {
 
   if (state === 'dead') return null;
 
+  const mat = <meshStandardMaterial color={character.color} roughness={0.7} />;
+
   return (
     <group ref={groupRef} position={[position.x, 0, position.z]}>
-      <mesh castShadow position={[0, CAPSULE_HEIGHT / 2, 0]}>
-        <capsuleGeometry args={[CAPSULE_RADIUS, CAPSULE_HEIGHT - CAPSULE_RADIUS * 2, 4, 8]} />
-        <meshStandardMaterial color={character.color} roughness={0.7} />
+      {/* Head */}
+      <mesh castShadow position={[0, 1.6, 0]}>
+        <sphereGeometry args={[0.25, 8, 8]} />
+        {mat}
       </mesh>
-      
-      <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
+      {/* Face on head front */}
+      <group position={[0, 1.6, 0]}>
         <CharacterFace color={character.color} />
-      </Billboard>
+      </group>
+
+      {/* Torso */}
+      <mesh castShadow position={[0, 1.05, 0]}>
+        <boxGeometry args={[0.5, 0.6, 0.25]} />
+        {mat}
+      </mesh>
+
+      {/* Left arm */}
+      <mesh castShadow position={[-0.38, 1.05, 0]} rotation={[0, 0, 0.25]}>
+        <boxGeometry args={[0.18, 0.52, 0.18]} />
+        {mat}
+      </mesh>
+
+      {/* Right arm */}
+      <mesh castShadow position={[0.38, 1.05, 0]} rotation={[0, 0, -0.25]}>
+        <boxGeometry args={[0.18, 0.52, 0.18]} />
+        {mat}
+      </mesh>
+
+      {/* Left leg */}
+      <mesh castShadow position={[-0.13, 0.42, 0]}>
+        <boxGeometry args={[0.22, 0.52, 0.22]} />
+        {mat}
+      </mesh>
+
+      {/* Right leg */}
+      <mesh castShadow position={[0.13, 0.42, 0]}>
+        <boxGeometry args={[0.22, 0.52, 0.22]} />
+        {mat}
+      </mesh>
     </group>
   );
 }

@@ -135,8 +135,8 @@ export const storyScenes: Record<string, Scene> = {
     environment: 'woods',
     cameraPosition: [0, 3, 6],
     choices: [
-      { id: 'ch2_run_cabin', text: 'Run back to cabin', nextScene: 'chapter3_start' },
-      { id: 'ch2_fight_back', text: 'Stand your ground', nextScene: 'chapter3_fight' },
+      { id: 'ch2_run_cabin', text: 'Run back to cabin', nextScene: 'chapter3_start', fearDelta: 15 },
+      { id: 'ch2_fight_back', text: 'Stand your ground', nextScene: 'chapter3_fight', fearDelta: 25 },
     ],
   },
   
@@ -171,7 +171,7 @@ export const storyScenes: Record<string, Scene> = {
     narratorText: 'The creature lunges. You barely escape, stumbling back to the lodge with scratches and torn clothes. But you saw it clearly. Not human. Not animal. Something ancient.',
     environment: 'woods',
     choices: [
-      { id: 'ch3_fight_continue', text: 'Continue', nextScene: 'chapter3_start' },
+      { id: 'ch3_fight_continue', text: 'Continue', nextScene: 'chapter3_start', fearDelta: 20 },
     ],
   },
   
@@ -194,8 +194,8 @@ export const storyScenes: Record<string, Scene> = {
     narratorText: 'The planchette moves. "B-E-T-H" It spells out a name. Then: "R-U-N". The door slammed shut on its own.',
     environment: 'lodge',
     choices: [
-      { id: 'ch3_escape_room', text: 'Force the door open', nextScene: 'chapter4_start' },
-      { id: 'ch3_wait_it_out', text: 'Wait in terror', nextScene: 'chapter4_start' },
+      { id: 'ch3_escape_room', text: 'Force the door open', nextScene: 'chapter4_start', fearDelta: 20 },
+      { id: 'ch3_wait_it_out', text: 'Wait in terror', nextScene: 'chapter4_start', fearDelta: 25 },
     ],
   },
   
@@ -220,8 +220,8 @@ export const storyScenes: Record<string, Scene> = {
     environment: 'woods',
     cameraPosition: [4, 2, 5],
     choices: [
-      { id: 'ch4_listen_stranger', text: 'Listen to his story', nextScene: 'ch4_stranger_tells' },
-      { id: 'ch4_doubt', text: 'Demand proof', nextScene: 'ch4_stranger_tells' },
+      { id: 'ch4_listen_stranger', text: 'Listen to his story', nextScene: 'ch4_stranger_tells', fearDelta: 15 },
+      { id: 'ch4_doubt', text: 'Demand proof', nextScene: 'ch4_stranger_tells', fearDelta: 15 },
     ],
   },
   
@@ -245,8 +245,8 @@ export const storyScenes: Record<string, Scene> = {
     environment: 'woods',
     cameraPosition: [0, 3, 7],
     choices: [
-      { id: 'ch5_split_up', text: 'Split up to cover more ground', nextScene: 'ending_sacrifice' },
-      { id: 'ch5_stay_together', text: 'Stay together', nextScene: 'ending_survival' },
+      { id: 'ch5_split_up', text: 'Split up to cover more ground', nextScene: 'ending_sacrifice', fearDelta: 30 },
+      { id: 'ch5_stay_together', text: 'Stay together', nextScene: 'ending_survival', fearDelta: 15 },
     ],
   },
   

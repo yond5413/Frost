@@ -8,6 +8,7 @@ export interface Choice {
   text: string;
   nextScene: string;
   consequence?: string;
+  fearDelta?: number;
 }
 
 export interface Scene {
@@ -56,9 +57,11 @@ interface GameState {
   addConsequence: (consequence: string) => void;
   clearActiveConsequence: () => void;
   setCurrentEnvironment: (env: EnvironmentType) => void;
+  voiceEnabled: boolean;
   activateWendigo: () => void;
   triggerJumpScare: () => void;
   clearJumpScare: () => void;
+  toggleVoice: () => void;
   resetGame: () => void;
 }
 
@@ -103,6 +106,7 @@ const initialState = {
   activeConsequence: null,
   wendigoActive: false,
   jumpScareActive: false,
+  voiceEnabled: false,
 };
 
 export const useGameStore = create<GameState>((set) => ({
@@ -148,6 +152,7 @@ export const useGameStore = create<GameState>((set) => ({
   activateWendigo: () => set({ wendigoActive: true }),
   triggerJumpScare: () => set({ jumpScareActive: true }),
   clearJumpScare: () => set({ jumpScareActive: false }),
+  toggleVoice: () => set((state) => ({ voiceEnabled: !state.voiceEnabled })),
 
   resetGame: () => set(initialState),
 }));
