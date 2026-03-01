@@ -90,8 +90,8 @@ function DefaultAtmosphere() {
 
   const fearRatio = fearLevel / 100;
 
-  const ambientIntensity = Math.max(0.01, 0.08 - fearRatio * 0.06);
-  const pointIntensity = 0.4 + fearRatio * 0.3;
+  const ambientIntensity = Math.max(0.04, 0.22 - fearRatio * 0.18);
+  const pointIntensity = 0.6 + fearRatio * 0.4;
   const fogDensity = 35 - fearRatio * 20;
   const fogColor = fearRatio > 0.5 ? '#050508' : '#0a0c12';
 
@@ -101,7 +101,7 @@ function DefaultAtmosphere() {
       <ambientLight intensity={ambientIntensity} color="#2a3550" />
       <directionalLight
         position={[10, 15, 5]}
-        intensity={0.15 * (1 - fearRatio * 0.5)}
+        intensity={0.30 * (1 - fearRatio * 0.5)}
         color="#556688"
         castShadow
         shadow-mapSize={[2048, 2048]}
@@ -150,15 +150,16 @@ function LodgeAtmosphere() {
   });
 
   const fogColor = fearRatio > 0.5 ? '#0a0808' : '#151010';
-  const ambientIntensity = Math.max(0.02, 0.06 - fearRatio * 0.04);
+  const ambientIntensity = Math.max(0.05, 0.28 - fearRatio * 0.23);
 
   return (
     <>
       <fog attach="fog" args={[fogColor, 10, 30 - fearRatio * 10]} />
-      <ambientLight intensity={ambientIntensity} color="#1a1510" />
-      <pointLight ref={fireRef} position={[0, 2, -2]} intensity={1.0} color="#ff4400" distance={10} decay={2} />
-      <pointLight position={[4, 2, 2]} intensity={0.1} color="#ff8822" distance={5} decay={2} />
-      <pointLight position={[-4, 2, 2]} intensity={0.1} color="#ff8822" distance={5} decay={2} />
+      <ambientLight intensity={ambientIntensity} color="#4a3020" />
+      <pointLight ref={fireRef} position={[0, 2, -2]} intensity={1.2} color="#ff4400" distance={14} decay={2} />
+      <pointLight position={[4, 2, 2]} intensity={0.25} color="#ff8822" distance={8} decay={2} />
+      <pointLight position={[-4, 2, 2]} intensity={0.25} color="#ff8822" distance={8} decay={2} />
+      <pointLight position={[0, 4, 1]} intensity={0.2} color="#cc7744" distance={8} decay={2} />
       {fearLevel > 50 && (
         <pointLight position={[0, 3, 3]} intensity={0.05} color="#330000" distance={4} decay={2} />
       )}

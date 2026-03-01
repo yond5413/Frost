@@ -43,7 +43,9 @@ export default function EnvironmentManager({ showCharacters = true }: Environmen
         return (
           <group>
             <ExpandedWoods />
-            <Cabin />
+            <group position={[0, 0, -22]}>
+              <Cabin />
+            </group>
           </group>
         );
       case 'mines':

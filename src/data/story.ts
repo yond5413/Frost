@@ -70,7 +70,7 @@ export const storyScenes: Record<string, Scene> = {
       { speaker: 'hannah', text: 'You... you all planned this? This is humiliation!', mood: 'angry', camera: 'closeup', fearDelta: 10 }
     ],
     choicesAt: 1,
-    environment: 'cabin',
+    environment: 'lodge',
     cameraPosition: [0, 2, 3],
     choices: [
       { id: 'prologue_hannah_runs', text: 'Continue', nextScene: 'prologue_hannah_runs' },
