@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '@/lib/store';
 
 export default function DontMoveQTE() {
@@ -8,7 +8,6 @@ export default function DontMoveQTE() {
     const [timeLeft, setTimeLeft] = useState(5);
     const [isFailed, setIsFailed] = useState(false);
     const [shakeOffset, setShakeOffset] = useState({ x: 0, y: 0 });
-    const shakeRef = useRef<number>(0);
     
     const safeZoneSize = Math.max(60, 180 - fearLevel * 1.2);
     const timerDuration = Math.max(2, 5 - fearLevel / 30);
@@ -16,7 +15,7 @@ export default function DontMoveQTE() {
     useEffect(() => {
         if (!qteActive || isFailed) return;
 
-        setTimeLeft(timerDuration);
+        const initTimer = setTimeout(() => setTimeLeft(timerDuration), 0);
 
         const handleMouseMove = (e: MouseEvent) => {
             const centerX = window.innerWidth / 2;
@@ -46,10 +45,10 @@ export default function DontMoveQTE() {
             });
         }, 30);
 
-        const timer = setInterval(() => {
+        const countdownTimer = setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 0.1) {
-                    clearInterval(timer);
+                    clearInterval(countdownTimer);
                     clearInterval(shakeInterval);
                     passQTE();
                     return 0;
@@ -60,7 +59,8 @@ export default function DontMoveQTE() {
 
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
-            clearInterval(timer);
+            clearTimeout(initTimer);
+            clearInterval(countdownTimer);
             clearInterval(shakeInterval);
             setShakeOffset({ x: 0, y: 0 });
         };
@@ -68,8 +68,11 @@ export default function DontMoveQTE() {
 
     useEffect(() => {
         if (!qteActive) {
-            setIsFailed(false);
-            setShakeOffset({ x: 0, y: 0 });
+            const timer = setTimeout(() => {
+                setIsFailed(false);
+                setShakeOffset({ x: 0, y: 0 });
+            }, 0);
+            return () => clearTimeout(timer);
         }
     }, [qteActive]);
 

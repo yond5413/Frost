@@ -7,7 +7,6 @@ import * as THREE from 'three';
 import { useGameStore } from '@/lib/store';
 
 interface InteractableObjectProps {
-    id: string;
     position: [number, number, number];
     label: string;
     onInteract: () => void;
@@ -17,7 +16,6 @@ interface InteractableObjectProps {
 }
 
 export default function InteractableObject({
-    id,
     position,
     label,
     onInteract,

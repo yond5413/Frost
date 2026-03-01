@@ -6,8 +6,14 @@ import { useFrame } from '@react-three/fiber';
 import InteractableObject from '../InteractableObject';
 import { useGameStore } from '@/lib/store';
 
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
 function ChimneySmoke() {
   const smokeRef = useRef<THREE.Points>(null);
+  const timeRef = useRef(0);
   
   const { positions, velocities, lifetimes } = useMemo(() => {
     const count = 30;
@@ -15,20 +21,22 @@ function ChimneySmoke() {
     const vel = new Float32Array(count * 3);
     const life = new Float32Array(count);
     for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 0.3;
-      pos[i * 3 + 1] = Math.random() * 3;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
-      vel[i * 3] = (Math.random() - 0.5) * 0.2;
-      vel[i * 3 + 1] = 0.5 + Math.random() * 0.5;
-      vel[i * 3 + 2] = (Math.random() - 0.5) * 0.2;
-      life[i] = Math.random();
+      pos[i * 3] = (seededRandom(i) - 0.5) * 0.3;
+      pos[i * 3 + 1] = seededRandom(i + 100) * 3;
+      pos[i * 3 + 2] = (seededRandom(i + 200) - 0.5) * 0.3;
+      vel[i * 3] = (seededRandom(i + 300) - 0.5) * 0.2;
+      vel[i * 3 + 1] = 0.5 + seededRandom(i + 400) * 0.5;
+      vel[i * 3 + 2] = (seededRandom(i + 500) - 0.5) * 0.2;
+      life[i] = seededRandom(i + 600);
     }
     return { positions: pos, velocities: vel, lifetimes: life };
   }, []);
   
   useFrame((_, delta) => {
     if (!smokeRef.current) return;
+    timeRef.current += delta;
     const pos = smokeRef.current.geometry.attributes.position.array as Float32Array;
+    const currentTime = timeRef.current;
     
     for (let i = 0; i < 30; i++) {
       pos[i * 3] += velocities[i * 3] * delta;
@@ -38,9 +46,9 @@ function ChimneySmoke() {
       lifetimes[i] += delta * 0.3;
       
       if (lifetimes[i] > 1) {
-        pos[i * 3] = (Math.random() - 0.5) * 0.3;
+        pos[i * 3] = (seededRandom(i + Math.floor(currentTime * 10)) - 0.5) * 0.3;
         pos[i * 3 + 1] = 0;
-        pos[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
+        pos[i * 3 + 2] = (seededRandom(i + Math.floor(currentTime * 10) + 200) - 0.5) * 0.3;
         lifetimes[i] = 0;
       }
     }
@@ -179,7 +187,6 @@ export default function Cabin() {
 
       {/* Interactable: Window */}
       <InteractableObject
-        id="cabin_window"
         label="Investigate Window"
         position={[0, 1.5, 3]}
         sceneAccess={['chapter2_start']}

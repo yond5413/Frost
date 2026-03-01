@@ -4,7 +4,7 @@ import { useGameStore } from '@/lib/store';
 import CharacterRoster from './CharacterRoster';
 
 export default function GameHUD() {
-  const { clues, fearLevel, phase, voiceEnabled, toggleVoice } = useGameStore();
+  const { clues, fearLevel, phase, voiceEnabled, toggleVoice, togglePause } = useGameStore();
 
   const fearBarColor =
     fearLevel > 70
@@ -27,6 +27,16 @@ export default function GameHUD() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Pause button */}
+          {(phase === 'scene' || phase === 'choice' || phase === 'exploration') && (
+            <button
+              onClick={togglePause}
+              className="pointer-events-auto text-xs font-mono px-2 py-1 border border-white/10 text-gray-600 hover:text-gray-400 hover:border-white/20 transition-all"
+            >
+              &#9646;&#9646;
+            </button>
+          )}
+
           {fearLevel > 0 && (
             <div className="flex items-center gap-2">
               <span className={`text-xs font-mono transition-colors duration-500 ${fearLevel > 70 ? 'text-red-500 animate-pulse' : 'text-red-400'}`}>

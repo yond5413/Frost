@@ -10,13 +10,31 @@ export default function JumpScare() {
   const [flashState, setFlashState] = useState<'none' | 'flash' | 'fade'>('none');
   const [vignetteOpacity, setVignetteOpacity] = useState(0);
   const [screenShake, setScreenShake] = useState(0);
+  const [shakeOffset, setShakeOffset] = useState({ x: 0, y: 0 });
   
   useEffect(() => {
-    if (jumpScareActive) {
-      // Phase 1: White flash
-      setFlashState('flash');
-      setVignetteOpacity(0);
-      setScreenShake(20);
+    if (screenShake > 0) {
+      const interval = setInterval(() => {
+        setShakeOffset({
+          x: (Math.random() - 0.5) * screenShake,
+          y: (Math.random() - 0.5) * screenShake,
+        });
+      }, 50);
+      return () => clearInterval(interval);
+    } else {
+      const timer = setTimeout(() => setShakeOffset({ x: 0, y: 0 }), 0);
+      return () => clearTimeout(timer);
+    }
+  }, [screenShake]);
+  
+   useEffect(() => {
+     if (jumpScareActive) {
+       // Phase 1: White flash
+       setTimeout(() => {
+         setFlashState('flash');
+         setVignetteOpacity(0);
+         setScreenShake(20);
+       }, 0);
       
       // Phase 2: Fade to red
       setTimeout(() => {
@@ -79,7 +97,7 @@ export default function JumpScare() {
       <div
         className="fixed inset-0 z-30 pointer-events-none"
         style={{
-          transform: screenShake > 0 ? `translate(${(Math.random() - 0.5) * screenShake}px, ${(Math.random() - 0.5) * screenShake}px)` : 'none',
+          transform: screenShake > 0 ? `translate(${shakeOffset.x}px, ${shakeOffset.y}px)` : 'none',
           transition: 'transform 0.05s ease-out',
         }}
       >

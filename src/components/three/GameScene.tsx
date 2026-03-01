@@ -15,6 +15,7 @@ import CinematicCamera from './CinematicCamera';
 import { getScene } from '@/data/story';
 import { JumpScareCameraEffect } from '@/components/ui/JumpScare';
 import LightningFlash from './LightningFlash';
+import PostProcessing from './PostProcessing';
 
 interface CameraControllerProps {
   target: [number, number, number];
@@ -89,12 +90,12 @@ export default function GameScene({ cameraPosition = [0, 3, 10] }: SceneProps) {
         {phase === 'exploration' && sceneData.interactables && sceneData.interactables.map((def) => (
           <InteractableObject
             key={def.id}
-            id={def.id}
             position={def.position}
             label={def.label}
             onInteract={() => handleInteract(def)}
           />
         ))}
+        <PostProcessing />
       </Suspense>
     </Canvas>
   );

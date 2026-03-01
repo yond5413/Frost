@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '@/lib/store';
@@ -16,12 +16,12 @@ export default function KeyboardCameraControls() {
   const { currentScene, phase } = useGameStore();
   
   const sceneData = getScene(currentScene);
-  const initialPos = sceneData.cameraPosition || [0, 3, 10];
-  const initialTarget = sceneData.cameraTarget || [0, 0, 0];
+  const initialPos = useMemo<[number, number, number]>(() => sceneData.cameraPosition || [0, 3, 10], [sceneData.cameraPosition]);
+  const initialTarget = useMemo<[number, number, number]>(() => sceneData.cameraTarget || [0, 0, 0], [sceneData.cameraTarget]);
   
   const targetRef = useRef(new THREE.Vector3(...initialTarget));
   const radiusRef = useRef(
-    new THREE.Vector3(...initialPos).distanceTo(targetRef.current)
+    new THREE.Vector3(...initialPos).distanceTo(new THREE.Vector3(...initialTarget))
   );
   const thetaRef = useRef(0); // yaw (horizontal)
   const phiRef = useRef(Math.PI / 4); // pitch (vertical), clamped 0.1 to PI-0.1

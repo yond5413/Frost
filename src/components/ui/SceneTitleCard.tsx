@@ -24,20 +24,23 @@ export default function SceneTitleCard() {
   useEffect(() => {
     if (!scene?.title || phase !== 'scene') return;
 
-    setDisplayedTitle(scene.title);
-    setDisplayedLabel(parseChapterLabel(currentScene));
-    setCardState('fadein');
+    const t0 = setTimeout(() => {
+      setDisplayedTitle(scene.title);
+      setDisplayedLabel(parseChapterLabel(currentScene));
+      setCardState('fadein');
+    }, 0);
 
     const t1 = setTimeout(() => setCardState('hold'), 700);
     const t2 = setTimeout(() => setCardState('fadeout'), 2700);
     const t3 = setTimeout(() => setCardState('hidden'), 4000);
 
     return () => {
+      clearTimeout(t0);
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [currentScene]);
+  }, [currentScene, scene?.title, phase]);
 
   if (cardState === 'hidden') return null;
 

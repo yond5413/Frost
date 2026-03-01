@@ -5,6 +5,11 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '@/lib/store';
 
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
 interface Props {
   position?: [number, number, number];
 }
@@ -23,7 +28,7 @@ function ShadowWendigo({ chapter, intensity }: { chapter: number; intensity: num
     eyePulseRef.current += delta * 4;
     
     const pulseIntensity = 2 + Math.sin(eyePulseRef.current) * 1.5;
-    const flicker = Math.random() > 0.94 ? 0.3 : 1;
+    const flicker = Math.sin(eyePulseRef.current * 15) > 0.8 ? 0.3 : 1;
     
     if (leftEyeRef.current && leftEyeRef.current.material && 'emissiveIntensity' in leftEyeRef.current.material) {
       (leftEyeRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity = pulseIntensity * flicker;
@@ -45,7 +50,6 @@ function ShadowWendigo({ chapter, intensity }: { chapter: number; intensity: num
   });
   
   const bodyOpacity = chapter <= 2 ? 0.15 : chapter <= 4 ? 0.3 : 0.5;
-  const eyeVisibility = 1;
   const antlerVisibility = chapter <= 2 ? 0 : chapter <= 4 ? 0.3 : 0.6;
   
   return (
@@ -121,26 +125,28 @@ function ShadowWendigo({ chapter, intensity }: { chapter: number; intensity: num
 
 function FogSwirl({ intensity = 1 }: { intensity?: number }) {
   const particlesRef = useRef<THREE.Points>(null);
+  const timeRef = useRef(0);
   
   const { positions, velocities } = useMemo(() => {
     const count = 60;
     const pos = new Float32Array(count * 3);
     const vel = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const radius = 0.5 + Math.random() * 2;
+      const angle = seededRandom(i) * Math.PI * 2;
+      const radius = 0.5 + seededRandom(i + 100) * 2;
       pos[i * 3] = Math.cos(angle) * radius;
-      pos[i * 3 + 1] = Math.random() * 0.8;
+      pos[i * 3 + 1] = seededRandom(i + 200) * 0.8;
       pos[i * 3 + 2] = Math.sin(angle) * radius;
-      vel[i * 3] = (Math.random() - 0.5) * 0.3;
-      vel[i * 3 + 1] = 0.2 + Math.random() * 0.3;
-      vel[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
+      vel[i * 3] = (seededRandom(i + 300) - 0.5) * 0.3;
+      vel[i * 3 + 1] = 0.2 + seededRandom(i + 400) * 0.3;
+      vel[i * 3 + 2] = (seededRandom(i + 500) - 0.5) * 0.3;
     }
     return { positions: pos, velocities: vel };
   }, []);
   
   useFrame((_, delta) => {
     if (!particlesRef.current) return;
+    timeRef.current += delta;
     const pos = particlesRef.current.geometry.attributes.position.array as Float32Array;
     
     for (let i = 0; i < 60; i++) {
@@ -150,8 +156,8 @@ function FogSwirl({ intensity = 1 }: { intensity?: number }) {
       
       const dist = Math.sqrt(pos[i * 3] ** 2 + pos[i * 3 + 2] ** 2);
       if (dist > 2.5 || pos[i * 3 + 1] > 1.5) {
-        const angle = Math.random() * Math.PI * 2;
-        const radius = Math.random() * 0.5;
+        const angle = (i * 2.399) + (timeRef.current * 0.5);
+        const radius = 0.1 + (i % 5) * 0.08;
         pos[i * 3] = Math.cos(angle) * radius;
         pos[i * 3 + 1] = 0;
         pos[i * 3 + 2] = Math.sin(angle) * radius;
@@ -256,7 +262,6 @@ export default function Wendigo({ position = [0, 0, -15] }: Props) {
         groupRef.current.position.set(0, 1.5, -2.5);
         groupRef.current.scale.setScalar(1.5);
       } else if (jumpScareTimerRef.current < 1000) {
-        const t = jumpScareTimerRef.current / 1000;
         groupRef.current.position.lerp(new THREE.Vector3(0, 1.5, -2.5), 0.3);
       } else {
         groupRef.current.scale.lerp(new THREE.Vector3(0, 0, 0), 0.2);

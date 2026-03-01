@@ -7,7 +7,7 @@ import * as THREE from 'three';
 function GroundFog({ density = 1 }: { density?: number }) {
   const fogRef = useRef<THREE.Points>(null);
   
-  const { positions, sizes } = useMemo(() => {
+  const { positions } = useMemo(() => {
     const count = 200 * density;
     const pos = new Float32Array(count * 3);
     const sz = new Float32Array(count);
@@ -58,7 +58,7 @@ function GroundFog({ density = 1 }: { density?: number }) {
 
 export default function ExpandedWoods() {
   const treeData = useMemo(() => {
-    const trees: { position: [number, number, number]; color: string; height: number }[] = [];
+    const trees: { position: [number, number, number]; color: string; height: number; trunkRadius1: number; trunkRadius2: number; branchRotations: number[] }[] = [];
     let seed = 12345;
     const seededRandom = () => {
       seed = (seed * 1103515245 + 12345) & 0x7fffffff;
@@ -72,7 +72,10 @@ export default function ExpandedWoods() {
       const hue = 100 + seededRandom() * 30;
       const lightness = 10 + seededRandom() * 8;
       const height = 2.5 + seededRandom() * 2;
-      trees.push({ position: [x, 0, z], color: `hsl(${hue}, 50%, ${lightness}%)`, height });
+      const trunkRadius1 = 0.2 + seededRandom() * 0.15;
+      const trunkRadius2 = 0.35 + seededRandom() * 0.2;
+      const branchRotations = [seededRandom() * 0.3, seededRandom() * 0.3, seededRandom() * 0.3];
+      trees.push({ position: [x, 0, z], color: `hsl(${hue}, 50%, ${lightness}%)`, height, trunkRadius1, trunkRadius2, branchRotations });
     }
     return trees;
   }, []);
@@ -104,7 +107,7 @@ export default function ExpandedWoods() {
         <group key={i} position={tree.position}>
           {/* Tree trunk */}
           <mesh position={[0, tree.height / 2, 0]} castShadow>
-            <cylinderGeometry args={[0.2 + Math.random() * 0.15, 0.35 + Math.random() * 0.2, tree.height, 8]} />
+            <cylinderGeometry args={[tree.trunkRadius1, tree.trunkRadius2, tree.height, 8]} />
             <meshStandardMaterial color="#0d0705" roughness={0.95} />
           </mesh>
           {/* Branches */}
@@ -112,7 +115,7 @@ export default function ExpandedWoods() {
             <mesh 
               key={j} 
               position={[0, tree.height * heightRatio, 0]} 
-              rotation={[0, j * 2.1, Math.PI / 4 + Math.random() * 0.3]}
+              rotation={[0, j * 2.1, Math.PI / 4 + tree.branchRotations[j]]}
               castShadow
             >
               <cylinderGeometry args={[0.04, 0.08, 1.2, 5]} />

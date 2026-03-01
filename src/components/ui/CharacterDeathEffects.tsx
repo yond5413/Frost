@@ -20,12 +20,15 @@ export default function CharacterDeathEffects() {
       timestamp: Date.now(),
     })).filter(d => !deathEvents.some(e => e.characterId === d.characterId));
     
-    if (newDeaths.length > deathEvents.length) {
+    if (newDeaths.length > 0) {
       const latest = newDeaths[newDeaths.length - 1];
-      setCurrentDeath(latest);
-      setDeathEvents(newDeaths);
+      const timer = setTimeout(() => {
+        setCurrentDeath(latest);
+        setDeathEvents(newDeaths);
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [consequences, deathEvents.length]);
+  }, [consequences, deathEvents]);
 
   if (!currentDeath) return null;
 
@@ -52,11 +55,11 @@ export default function CharacterDeathEffects() {
 function DeathAnimation({ characterName, onComplete }: { characterName: string; onComplete: () => void }) {
   const [phase, setPhase] = useState<'flash' | 'name' | 'fade' | 'done'>('flash');
 
-  useEffect(() => {
-    setTimeout(() => setPhase('name'), 150);
-    setTimeout(() => setPhase('fade'), 2000);
-    setTimeout(() => { setPhase('done'); onComplete(); }, 4000);
-  }, []);
+   useEffect(() => {
+     setTimeout(() => setPhase('name'), 150);
+     setTimeout(() => setPhase('fade'), 2000);
+     setTimeout(() => { setPhase('done'); onComplete(); }, 4000);
+   }, [onComplete]);
 
   if (phase === 'done') return null;
 

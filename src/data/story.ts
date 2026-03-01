@@ -212,6 +212,7 @@ export const storyScenes: Record<string, Scene> = {
     choicesAt: 1,
     environment: 'lodge',
     cameraPosition: [-3, 2, 5],
+    fearReset: true,
     choices: [
       { id: 'ch1_go_arrive', text: 'Head to the lodge', nextScene: 'ch1_arrive' },
     ],
@@ -538,13 +539,12 @@ export const storyScenes: Record<string, Scene> = {
     environment: 'lodge',
     cameraPosition: [0, 3, 6],
     cameraTarget: [0, 1, 0],
-    cameraControls: true,
     activeCharacter: 'sam',
-    interactables: [
-      { id: 'kitchen_door', position: [4, 1, -2], label: 'Check Kitchen', targetScene: 'ch1_explore_kitchen' },
-      { id: 'lobby_totem', position: [-3, 0.5, -1], label: 'Examine Strange Object', targetScene: 'ch1_clue_found' }
+    choices: [
+      { id: 'ch1_lobby_examine', text: 'Examine the strange glint by the clock', nextScene: 'ch1_clue_found' },
+      { id: 'ch1_lobby_kitchen', text: 'Check the ajar kitchen door', nextScene: 'ch1_explore_kitchen' },
+      { id: 'ch1_lobby_skip', text: 'Leave it — find Josh instead', nextScene: 'ch1_night_fall' },
     ],
-    choices: [],
   },
 
   ch1_explore_kitchen: {
@@ -605,6 +605,7 @@ export const storyScenes: Record<string, Scene> = {
     id: 'chapter2_start',
     title: 'Chapter 2: The Disappearance',
     description: 'After the scream...',
+    fearReset: true,
     dialogue: [
       {
         speaker: 'narrator',
@@ -638,6 +639,7 @@ export const storyScenes: Record<string, Scene> = {
     activeCharacter: 'mike',
     choices: [
       { id: 'ch2_follow_mike', text: 'Follow Mike', nextScene: 'ch2_scream_heard' },
+      { id: 'ch2_hang_back', text: 'Hang back — call for help', nextScene: 'ch2_scream_heard', fearDelta: 5, consequence: 'You hesitated. The others saw it.' },
     ],
   },
 
@@ -691,6 +693,7 @@ export const storyScenes: Record<string, Scene> = {
     activeCharacter: 'mike',
     choices: [
       { id: 'ch2_search_room', text: 'Search the room', nextScene: 'ch2_search_room', fearDelta: 10 },
+      { id: 'ch2_leave_now', text: 'Leave immediately — get help', nextScene: 'ch2_woods_deep', fearDelta: 20, consequence: 'You ran. Some would call it smart. Others, cowardly.' },
     ],
   },
 
@@ -740,6 +743,7 @@ export const storyScenes: Record<string, Scene> = {
     ],
     choicesAt: 1,
     environment: 'cabin',
+
     cameraPosition: [1, 1.5, 2],
     activeCharacter: 'mike',
     choices: [
@@ -1071,7 +1075,8 @@ export const storyScenes: Record<string, Scene> = {
     cameraTarget: [1, 1, 0],
     activeCharacter: 'mike',
     choices: [
-      { id: 'ch2_to_shed', text: 'Follow Mike', nextScene: 'ch2_find_mike', fearDelta: 15 },
+      { id: 'ch2_to_shed', text: 'Follow Mike to the shed', nextScene: 'ch2_find_mike', fearDelta: 15 },
+      { id: 'ch2_search_alone', text: 'Search for Jessica alone', nextScene: 'ch2_find_mike', fearDelta: 35, consequence: 'You went back into the dark alone. A decision you may regret.' },
     ],
   },
 

@@ -1,7 +1,15 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { EnvironmentType } from './environmentStore';
 
 export type GamePhase = 'intro' | 'exploration' | 'dialogue' | 'choice' | 'scene' | 'ending';
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  type: 'key' | 'note' | 'tool';
+  description: string;
+}
 
 export interface Choice {
   id: string;
@@ -31,6 +39,7 @@ export interface Scene {
   environment?: 'cabin' | 'woods' | 'mines' | 'lodge';
   activeCharacter?: string;
   aiDriven?: boolean; // NEW: AI generates outcome for this scene
+  fearReset?: boolean; // NEW: Reset fear level to 0 at the start of this scene
   // Legacy support while migrating
   narratorText?: string;
   speaker?: string;
@@ -56,6 +65,27 @@ export interface CharacterPosition {
   z: number;
 }
 
+export type NarratorPersonality = 'balanced' | 'brutal' | 'merciful' | 'chaotic';
+
+export interface BehavioralProfile {
+  recklessness: number;
+  loyalty: number;
+  deception: number;
+  survivalFocus: number;
+}
+
+export interface StoryMemoryEntry {
+  choiceId: string;
+  sceneId: string;
+  consequence: string;
+  behavioralDeltas?: Partial<BehavioralProfile>;
+}
+
+export interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 interface GameState {
   phase: GamePhase;
   currentScene: string;
@@ -76,6 +106,18 @@ interface GameState {
   jumpScareActive: boolean;
   currentSpeaker: string;
   currentCameraShot: CameraShot;
+  // AI narrative engine
+  conversationHistory: ConversationMessage[];
+  storyMemory: StoryMemoryEntry[];
+  aiServiceStatus: 'healthy' | 'degraded' | 'offline';
+  // Inventory
+  inventory: InventoryItem[];
+  // Narrator personality
+  narratorPersonality: NarratorPersonality;
+  // Behavioral profile (4-axis, 0-100)
+  behavioralProfile: BehavioralProfile;
+  // Pause state (not persisted)
+  isPaused: boolean;
 
   // Actions
   setPhase: (phase: GamePhase) => void;
@@ -90,6 +132,7 @@ interface GameState {
   updateRelationship: (char1: string, char2: string, delta: number) => void;
   addClue: (clue: string) => void;
   incrementFear: (amount: number) => void;
+  setFearLevel: (level: number) => void;
   addConsequence: (consequence: string) => void;
   clearActiveConsequence: () => void;
   setCurrentEnvironment: (env: EnvironmentType) => void;
@@ -116,6 +159,22 @@ interface GameState {
   getButterflyChoice: (segmentId: string) => string | undefined;
 
   resetGame: () => void;
+
+  // AI state management
+  addToConversationHistory: (role: 'user' | 'assistant', content: string) => void;
+  addStoryMemory: (entry: StoryMemoryEntry) => void;
+  setAiServiceStatus: (status: 'healthy' | 'degraded' | 'offline') => void;
+
+  // Inventory
+  addItem: (item: InventoryItem) => void;
+  removeItem: (id: string) => void;
+  useItem: (id: string) => void;
+  // Narrator personality
+  setNarratorPersonality: (p: NarratorPersonality) => void;
+  // Behavioral profile
+  updateBehavioralProfile: (deltas: Partial<BehavioralProfile>) => void;
+  // Pause
+  togglePause: () => void;
 }
 
 const initialState = {
@@ -136,16 +195,16 @@ const initialState = {
     beth: 'alive',
   } as Record<string, 'alive' | 'dead' | 'unknown'>,
   characterPositions: {
-    sam:     { x: -2, y: 0, z: 2 },
-    mike:    { x:  2, y: 0, z: 2 },
-    jessica: { x:  3, y: 0, z: 1 },
-    emily:   { x: -3, y: 0, z: 1 },
-    ashley:  { x:  1, y: 0, z: 3 },
-    chris:   { x: -1, y: 0, z: 3 },
-    josh:    { x:  0, y: 0, z: 3 },
-    matt:    { x:  2, y: 0, z: 0 },
-    hannah:  { x: -2, y: 0, z: 0 },
-    beth:    { x:  0, y: 0, z: 2 },
+    sam: { x: -2, y: 0, z: 2 },
+    mike: { x: 2, y: 0, z: 2 },
+    jessica: { x: 3, y: 0, z: 1 },
+    emily: { x: -3, y: 0, z: 1 },
+    ashley: { x: 1, y: 0, z: 3 },
+    chris: { x: -1, y: 0, z: 3 },
+    josh: { x: 0, y: 0, z: 3 },
+    matt: { x: 2, y: 0, z: 0 },
+    hannah: { x: -2, y: 0, z: 0 },
+    beth: { x: 0, y: 0, z: 2 },
   } as Record<string, CharacterPosition>,
   characterAnimations: {
     sam: 'idle',
@@ -189,9 +248,21 @@ const initialState = {
   qteActive: false,
   currentSpeaker: 'narrator',
   currentCameraShot: 'wide' as CameraShot,
+  conversationHistory: [],
+  storyMemory: [],
+  aiServiceStatus: 'healthy' as const,
+  inventory: [],
+  narratorPersonality: 'balanced' as NarratorPersonality,
+  behavioralProfile: {
+    recklessness: 50,
+    loyalty: 50,
+    deception: 50,
+    survivalFocus: 50,
+  } as BehavioralProfile,
+  isPaused: false,
 };
 
-export const useGameStore = create<GameState>((set, get) => ({
+export const useGameStore = create<GameState>()(persist((set, get) => ({
   ...initialState,
 
   setPhase: (phase) => set({ phase }),
@@ -237,7 +308,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         ...state.relationships,
         [key]: {
           ...state.relationships[key],
-          value: Math.min(100, Math.max(0, (state.relationships[key] as any || { value: 50 }).value + delta))
+          value: Math.min(100, Math.max(0, ((state.relationships[key] as { value: number } | undefined)?.value ?? 50) + delta))
         }
       }
     };
@@ -250,6 +321,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   incrementFear: (amount) => set((state) => ({
     fearLevel: Math.min(100, Math.max(0, state.fearLevel + amount)),
   })),
+
+  setFearLevel: (level) => set({ fearLevel: level }),
 
   addConsequence: (consequence) => set((state) => ({
     consequences: [...state.consequences, consequence],
@@ -293,19 +366,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     relationshipChanges?: Array<{ character1: string; character2: string; delta: number }>;
   }) => {
     const state = get();
-    
+
     // Handle character death
     if (aiResponse.characterDeath) {
       state.updateCharacterState(aiResponse.characterDeath, 'dead');
       state.addConsequence(`death_${aiResponse.characterDeath}`);
     }
-    
+
     // Handle butterfly effect
     if (aiResponse.butterflyEffect) {
       state.setButterflyEffect(aiResponse.butterflyEffect.id, aiResponse.butterflyEffect.choice);
       state.addConsequence(`butterfly_${aiResponse.butterflyEffect.id}`);
     }
-    
+
     // Handle relationship changes
     if (aiResponse.relationshipChanges) {
       aiResponse.relationshipChanges.forEach(change => {
@@ -317,7 +390,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   getRelationship: (char1: string, char2: string): number => {
     const state = get();
     const key = [char1, char2].sort().join('_');
-    return (state.relationships[key] as any)?.value ?? 50;
+    return (state.relationships[key] as { value: number } | undefined)?.value ?? 50;
   },
 
   getButterflyChoice: (segmentId: string): string | undefined => {
@@ -326,4 +399,56 @@ export const useGameStore = create<GameState>((set, get) => ({
   },
 
   resetGame: () => set(initialState),
+
+  addToConversationHistory: (role, content) => set((state) => ({
+    conversationHistory: [
+      ...state.conversationHistory.slice(-9),
+      { role, content },
+    ],
+  })),
+
+  addStoryMemory: (entry) => set((state) => ({
+    storyMemory: [...state.storyMemory, entry],
+  })),
+
+  setAiServiceStatus: (status) => set({ aiServiceStatus: status }),
+
+  addItem: (item) => set((state) => ({
+    inventory: [...state.inventory, item],
+  })),
+
+  removeItem: (id) => set((state) => ({
+    inventory: state.inventory.filter((i) => i.id !== id),
+  })),
+
+  useItem: (id) => set((state) => ({
+    inventory: state.inventory.filter((i) => i.id !== id),
+  })),
+
+  setNarratorPersonality: (p) => set({ narratorPersonality: p }),
+
+  updateBehavioralProfile: (deltas) => set((state) => ({
+    behavioralProfile: {
+      recklessness: Math.min(100, Math.max(0, state.behavioralProfile.recklessness + (deltas.recklessness ?? 0))),
+      loyalty: Math.min(100, Math.max(0, state.behavioralProfile.loyalty + (deltas.loyalty ?? 0))),
+      deception: Math.min(100, Math.max(0, state.behavioralProfile.deception + (deltas.deception ?? 0))),
+      survivalFocus: Math.min(100, Math.max(0, state.behavioralProfile.survivalFocus + (deltas.survivalFocus ?? 0))),
+    },
+  })),
+
+  togglePause: () => set((state) => ({ isPaused: !state.isPaused })),
+}), {
+  name: 'frost-game-state',
+  partialize: (state) => ({
+    fearLevel: state.fearLevel,
+    characterStates: state.characterStates,
+    inventory: state.inventory,
+    storyMemory: state.storyMemory,
+    currentScene: state.currentScene,
+    playerChoices: state.playerChoices,
+    butterflyEffects: state.butterflyEffects,
+    relationships: state.relationships,
+    narratorPersonality: state.narratorPersonality,
+    behavioralProfile: state.behavioralProfile,
+  }),
 }));

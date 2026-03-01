@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useMemo } from 'react';
+import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useTexture } from '@react-three/drei';
@@ -79,6 +79,49 @@ function ShockedMouth() {
   );
 }
 
+function Eyebrows({ mood = 'neutral', intensity = 1 }: { mood?: string; intensity?: number }) {
+  const leftRef = useRef<THREE.Mesh>(null);
+  const rightRef = useRef<THREE.Mesh>(null);
+
+  useFrame((state) => {
+    if (!leftRef.current || !rightRef.current) return;
+    const time = state.clock.elapsedTime;
+
+    // Subtle movement
+    const jitter = Math.sin(time * 10) * 0.002 * intensity;
+
+    if (mood === 'angry') {
+      leftRef.current.rotation.z = -0.4;
+      rightRef.current.rotation.z = 0.4;
+      leftRef.current.position.y = 0.12 + jitter;
+      rightRef.current.position.y = 0.12 + jitter;
+    } else if (mood === 'scared' || mood === 'shock') {
+      leftRef.current.rotation.z = 0.3;
+      rightRef.current.rotation.z = -0.3;
+      leftRef.current.position.y = 0.16 + jitter;
+      rightRef.current.position.y = 0.16 + jitter;
+    } else {
+      leftRef.current.rotation.z = 0;
+      rightRef.current.rotation.z = 0;
+      leftRef.current.position.y = 0.14 + jitter;
+      rightRef.current.position.y = 0.14 + jitter;
+    }
+  });
+
+  return (
+    <group position={[0, 0, 0.19]}>
+      <mesh ref={leftRef} position={[-0.1, 0.14, 0]}>
+        <boxGeometry args={[0.1, 0.02, 0.01]} />
+        <meshStandardMaterial color="#332211" />
+      </mesh>
+      <mesh ref={rightRef} position={[0.1, 0.14, 0]}>
+        <boxGeometry args={[0.1, 0.02, 0.01]} />
+        <meshStandardMaterial color="#332211" />
+      </mesh>
+    </group>
+  );
+}
+
 export default function Character({ characterId }: CharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
   const leftArmRef = useRef<THREE.Group>(null);
@@ -106,41 +149,62 @@ export default function Character({ characterId }: CharacterProps) {
     if (!groupRef.current) return;
     timeRef.current += delta;
 
+    // Base breathing animation (Idle)
+    const breathOffset = Math.sin(timeRef.current * 1.5) * 0.01;
+
     const walkSpeed = 8;
     const isWalking = animation === 'walk';
+    const isTalking = animation === 'talking';
 
     const bobOffset = isWalking
       ? Math.abs(Math.sin(timeRef.current * walkSpeed)) * 0.12
       : isScared
-        ? Math.sin(timeRef.current * 3) * 0.015
-        : Math.sin(timeRef.current * 2) * 0.02;
+        ? Math.sin(timeRef.current * 15) * 0.01 // Fast tremble
+        : breathOffset;
 
     groupRef.current.position.y = position.y + bobOffset;
 
     if (isWalking) {
       const swingAngle = Math.sin(timeRef.current * walkSpeed) * 0.6;
-      if (leftArmRef.current) leftArmRef.current.rotation.x = swingAngle;
-      if (rightArmRef.current) rightArmRef.current.rotation.x = -swingAngle;
+      if (leftArmRef.current) {
+        leftArmRef.current.rotation.x = swingAngle;
+        leftArmRef.current.rotation.z = -0.1;
+      }
+      if (rightArmRef.current) {
+        rightArmRef.current.rotation.x = -swingAngle;
+        rightArmRef.current.rotation.z = 0.1;
+      }
       if (leftLegRef.current) leftLegRef.current.rotation.x = -swingAngle;
       if (rightLegRef.current) rightLegRef.current.rotation.x = swingAngle;
     } else if (isScared) {
-      const tremble = Math.sin(timeRef.current * 20) * 0.02;
+      const tremble = Math.sin(timeRef.current * 30) * 0.02;
       if (leftArmRef.current) {
-        leftArmRef.current.rotation.x = 0.3 + tremble;
-        leftArmRef.current.rotation.z = -0.2;
+        leftArmRef.current.rotation.x = 0.4 + tremble;
+        leftArmRef.current.rotation.z = -0.3;
       }
       if (rightArmRef.current) {
-        rightArmRef.current.rotation.x = 0.3 + tremble;
-        rightArmRef.current.rotation.z = 0.2;
+        rightArmRef.current.rotation.x = 0.4 + tremble;
+        rightArmRef.current.rotation.z = 0.3;
+      }
+    } else if (isTalking) {
+      const talkNod = Math.sin(timeRef.current * 4) * 0.05;
+      if (leftArmRef.current) {
+        leftArmRef.current.rotation.x = 0.2 + talkNod;
+        leftArmRef.current.rotation.z = -0.1;
+      }
+      if (rightArmRef.current) {
+        rightArmRef.current.rotation.x = 0.1 - talkNod;
+        rightArmRef.current.rotation.z = 0.1;
       }
     } else {
+      // Idle / Default
       if (leftArmRef.current) {
-        leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, 0, 0.1);
-        leftArmRef.current.rotation.z = THREE.MathUtils.lerp(leftArmRef.current.rotation.z, 0, 0.1);
+        leftArmRef.current.rotation.x = THREE.MathUtils.lerp(leftArmRef.current.rotation.x, 0.1, 0.1);
+        leftArmRef.current.rotation.z = THREE.MathUtils.lerp(leftArmRef.current.rotation.z, -0.05, 0.1);
       }
       if (rightArmRef.current) {
-        rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0, 0.1);
-        rightArmRef.current.rotation.z = THREE.MathUtils.lerp(rightArmRef.current.rotation.z, 0, 0.1);
+        rightArmRef.current.rotation.x = THREE.MathUtils.lerp(rightArmRef.current.rotation.x, 0.1, 0.1);
+        rightArmRef.current.rotation.z = THREE.MathUtils.lerp(rightArmRef.current.rotation.z, 0.05, 0.1);
       }
       if (leftLegRef.current) leftLegRef.current.rotation.x = THREE.MathUtils.lerp(leftLegRef.current.rotation.x, 0, 0.1);
       if (rightLegRef.current) rightLegRef.current.rotation.x = THREE.MathUtils.lerp(rightLegRef.current.rotation.x, 0, 0.1);
@@ -168,8 +232,8 @@ export default function Character({ characterId }: CharacterProps) {
 
   if (charState === 'dead') return null;
 
-  const skinMat = <meshStandardMaterial color="#e8c4a0" roughness={0.8} />;
-  const clothingMat = <meshStandardMaterial color={character.color} roughness={0.7} />;
+  const skinMat = <meshStandardMaterial color="#e8c4a0" roughness={0.8} emissive="#e8c4a0" emissiveIntensity={0.05} />;
+  const clothingMat = <meshStandardMaterial color={character.color} roughness={0.7} emissive={character.color} emissiveIntensity={0.03} />;
 
   const silhouetteProfiles = {
     sam: { height: 1.7, width: 0.44, build: 'average', hairColor: '#d4a574' },
@@ -189,11 +253,19 @@ export default function Character({ characterId }: CharacterProps) {
 
   return (
     <group ref={groupRef} position={[position.x, 0, position.z]}>
+      {/* Neck */}
+      <mesh position={[0, headY - 0.2, 0]}>
+        <cylinderGeometry args={[0.08, 0.1, 0.2, 8]} />
+        {skinMat}
+      </mesh>
+
+      {/* Head */}
       <mesh castShadow position={[0, headY, 0]}>
         <sphereGeometry args={[0.22, 32, 32]} />
         {skinMat}
       </mesh>
 
+      {/* Hair & Features (same as before) */}
       {characterId === 'sam' && (
         <group position={[0, headY, 0]}>
           <mesh position={[0, 0.08, -0.08]}>
@@ -212,10 +284,6 @@ export default function Character({ characterId }: CharacterProps) {
           <mesh>
             <sphereGeometry args={[0.24, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.35]} />
             <meshStandardMaterial color={profile.hairColor} />
-          </mesh>
-          <mesh position={[0, -0.4, 0.1]} rotation={[0.3, 0, 0]}>
-            <boxGeometry args={[0.15, 0.08, 0.08]} />
-            <meshStandardMaterial color="#c9a86c" />
           </mesh>
         </group>
       )}
@@ -292,7 +360,7 @@ export default function Character({ characterId }: CharacterProps) {
       {characterId === 'matt' && (
         <group position={[0, headY, 0]}>
           <mesh>
-            <sphereGeometry args={[0.24, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.4]} />
+            <sphereGeometry args={[0.24, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.45]} />
             <meshStandardMaterial color={profile.hairColor} />
           </mesh>
           <mesh position={[0.2, 0.1, 0]} rotation={[0, 0.3, 0.3]}>
@@ -302,56 +370,100 @@ export default function Character({ characterId }: CharacterProps) {
         </group>
       )}
 
-      {(isScared || isShocked) && (
-        <group position={[0, headY, 0]}>
-          <ScaredEyes intensity={isShocked ? 2 : 1} />
-          {isShocked && <ShockedMouth />}
-        </group>
-      )}
+
+      {/* Eyes, Mouth & Brows */}
+      <group position={[0, headY, 0]}>
+        {(isScared || isShocked) && (
+          <>
+            <ScaredEyes intensity={isShocked ? 2 : 1} />
+            {isShocked && <ShockedMouth />}
+          </>
+        )}
+        <Eyebrows mood={isShocked ? 'shock' : isScared ? 'scared' : 'neutral'} intensity={isScared ? 1.5 : 1} />
+      </group>
 
       <group position={[0, headY, 0]}>
         <CharacterFace characterId={characterId} />
       </group>
 
+      {/* Torso */}
       <mesh castShadow position={[0, profile.height * 0.55, 0]}>
         <capsuleGeometry args={[torsoWidth * 0.5, torsoHeight, 8, 16]} />
         {clothingMat}
       </mesh>
 
+      {/* Arms with segments */}
       <group position={[-torsoWidth * 0.7, profile.height * 0.68, 0]} ref={leftArmRef}>
-        <mesh castShadow position={[0, -0.25, 0]}>
-          <capsuleGeometry args={[0.065, 0.45, 4, 8]} />
+        <mesh castShadow position={[0, -0.2, 0]}>
+          <capsuleGeometry args={[0.06, 0.3, 4, 8]} />
           {clothingMat}
         </mesh>
-        <mesh position={[0, -0.55, 0]}>
-          <sphereGeometry args={[0.065, 8, 8]} />
-          {skinMat}
-        </mesh>
+        <group position={[0, -0.35, 0]}>
+          <mesh castShadow position={[0, -0.15, 0]}>
+            <capsuleGeometry args={[0.055, 0.3, 4, 8]} />
+            {skinMat}
+          </mesh>
+          {/* Hand */}
+          <mesh position={[0, -0.32, 0]}>
+            <boxGeometry args={[0.08, 0.1, 0.03]} />
+            {skinMat}
+          </mesh>
+        </group>
       </group>
 
       <group position={[torsoWidth * 0.7, profile.height * 0.68, 0]} ref={rightArmRef}>
-        <mesh castShadow position={[0, -0.25, 0]}>
-          <capsuleGeometry args={[0.065, 0.45, 4, 8]} />
+        <mesh castShadow position={[0, -0.2, 0]}>
+          <capsuleGeometry args={[0.06, 0.3, 4, 8]} />
           {clothingMat}
         </mesh>
-        <mesh position={[0, -0.55, 0]}>
-          <sphereGeometry args={[0.065, 8, 8]} />
-          {skinMat}
-        </mesh>
+        <group position={[0, -0.35, 0]}>
+          <mesh castShadow position={[0, -0.15, 0]}>
+            <capsuleGeometry args={[0.055, 0.3, 4, 8]} />
+            {skinMat}
+          </mesh>
+          {/* Hand */}
+          <mesh position={[0, -0.32, 0]}>
+            <boxGeometry args={[0.08, 0.1, 0.03]} />
+            {skinMat}
+          </mesh>
+        </group>
       </group>
 
+      {/* Legs with segments */}
       <group position={[-torsoWidth * 0.3, profile.height * 0.35, 0]} ref={leftLegRef}>
-        <mesh castShadow position={[0, -0.35, 0]}>
-          <capsuleGeometry args={[0.09, 0.6, 4, 8]} />
-          <meshStandardMaterial color="#2a2a2a" roughness={0.8} />
+        <mesh castShadow position={[0, -0.25, 0]}>
+          <capsuleGeometry args={[0.09, 0.4, 4, 8]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.8} />
         </mesh>
+        <group position={[0, -0.45, 0]}>
+          <mesh castShadow position={[0, -0.2, 0]}>
+            <capsuleGeometry args={[0.08, 0.4, 4, 8]} />
+            <meshStandardMaterial color="#1a1a1a" roughness={0.8} />
+          </mesh>
+          {/* Foot */}
+          <mesh position={[0, -0.4, 0.1]}>
+            <boxGeometry args={[0.12, 0.06, 0.2]} />
+            <meshStandardMaterial color="#111111" />
+          </mesh>
+        </group>
       </group>
 
       <group position={[torsoWidth * 0.3, profile.height * 0.35, 0]} ref={rightLegRef}>
-        <mesh castShadow position={[0, -0.35, 0]}>
-          <capsuleGeometry args={[0.09, 0.6, 4, 8]} />
-          <meshStandardMaterial color="#2a2a2a" roughness={0.8} />
+        <mesh castShadow position={[0, -0.25, 0]}>
+          <capsuleGeometry args={[0.09, 0.4, 4, 8]} />
+          <meshStandardMaterial color="#1a1a1a" roughness={0.8} />
         </mesh>
+        <group position={[0, -0.45, 0]}>
+          <mesh castShadow position={[0, -0.2, 0]}>
+            <capsuleGeometry args={[0.08, 0.4, 4, 8]} />
+            <meshStandardMaterial color="#1a1a1a" roughness={0.8} />
+          </mesh>
+          {/* Foot */}
+          <mesh position={[0, -0.4, 0.1]}>
+            <boxGeometry args={[0.12, 0.06, 0.2]} />
+            <meshStandardMaterial color="#111111" />
+          </mesh>
+        </group>
       </group>
     </group>
   );

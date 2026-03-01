@@ -6,8 +6,14 @@ import * as THREE from 'three';
 import InteractableObject from '../InteractableObject';
 import { useGameStore } from '@/lib/store';
 
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
 function FireParticles() {
   const particlesRef = useRef<THREE.Points>(null);
+  const timeRef = useRef(0);
   
   const { positions, velocities, lifetimes } = useMemo(() => {
     const count = 40;
@@ -15,38 +21,40 @@ function FireParticles() {
     const vel = new Float32Array(count * 3);
     const life = new Float32Array(count);
     for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 0.3;
-      pos[i * 3 + 1] = Math.random() * 1.2;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
-      vel[i * 3] = (Math.random() - 0.5) * 0.15;
-      vel[i * 3 + 1] = 1.5 + Math.random() * 1;
-      vel[i * 3 + 2] = (Math.random() - 0.5) * 0.15;
-      life[i] = Math.random();
+      pos[i * 3] = (seededRandom(i) - 0.5) * 0.3;
+      pos[i * 3 + 1] = seededRandom(i + 100) * 1.2;
+      pos[i * 3 + 2] = (seededRandom(i + 200) - 0.5) * 0.3;
+      vel[i * 3] = (seededRandom(i + 300) - 0.5) * 0.15;
+      vel[i * 3 + 1] = 1.5 + seededRandom(i + 400) * 1;
+      vel[i * 3 + 2] = (seededRandom(i + 500) - 0.5) * 0.15;
+      life[i] = seededRandom(i + 600);
     }
     return { positions: pos, velocities: vel, lifetimes: life };
   }, []);
-  
+
   useFrame((_, delta) => {
     if (!particlesRef.current) return;
+    timeRef.current += delta;
     const pos = particlesRef.current.geometry.attributes.position.array as Float32Array;
-    
+    const currentTime = timeRef.current;
+
     for (let i = 0; i < 40; i++) {
       pos[i * 3] += velocities[i * 3] * delta;
       pos[i * 3 + 1] += velocities[i * 3 + 1] * delta;
       pos[i * 3 + 2] += velocities[i * 3 + 2] * delta;
-      
+
       lifetimes[i] += delta * 1.2;
-      
+
       if (lifetimes[i] > 1) {
-        pos[i * 3] = (Math.random() - 0.5) * 0.3;
+        pos[i * 3] = (seededRandom(i + Math.floor(currentTime * 10)) - 0.5) * 0.3;
         pos[i * 3 + 1] = 0;
-        pos[i * 3 + 2] = (Math.random() - 0.5) * 0.3;
+        pos[i * 3 + 2] = (seededRandom(i + Math.floor(currentTime * 10) + 200) - 0.5) * 0.3;
         lifetimes[i] = 0;
       }
     }
     particlesRef.current.geometry.attributes.position.needsUpdate = true;
   });
-  
+
   return (
     <points ref={particlesRef} position={[0, 0.8, 0]}>
       <bufferGeometry>
@@ -83,27 +91,27 @@ export default function LodgeInterior() {
       {/* Floor */}
       <mesh position={[0, 0, 0]} receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[12, 10]} />
-        <meshStandardMaterial color="#2a1a0a" roughness={0.9} />
+        <meshStandardMaterial color="#4a3a2a" roughness={0.8} />
       </mesh>
 
       {/* Ceiling */}
       <mesh position={[0, 5, 0]} receiveShadow rotation={[Math.PI / 2, 0, 0]}>
         <planeGeometry args={[12, 10]} />
-        <meshStandardMaterial color="#1a1008" roughness={0.9} />
+        <meshStandardMaterial color="#2a2018" roughness={0.8} />
       </mesh>
 
       {/* Walls */}
       {[-5.85, 5.85].map((x, i) => (
         <mesh key={`wall-${i}`} position={[x, 2.5, 0]} receiveShadow>
           <boxGeometry args={[0.3, 5, 10]} />
-          <meshStandardMaterial color="#3d2817" roughness={0.8} />
+          <meshStandardMaterial color="#5d4837" roughness={0.7} />
         </mesh>
       ))}
 
       {[-4.85, 4.85].map((z, i) => (
         <mesh key={`wall2-${i}`} position={[0, 2.5, z]} receiveShadow>
           <boxGeometry args={[12, 5, 0.3]} />
-          <meshStandardMaterial color="#3d2817" roughness={0.8} />
+          <meshStandardMaterial color="#5d4837" roughness={0.7} />
         </mesh>
       ))}
 
@@ -251,7 +259,6 @@ export default function LodgeInterior() {
 
       {/* Interactable: Totem */}
       <InteractableObject
-        id="lodge_totem"
         label="Examine Totem"
         position={[-3, 1.3, -2]}
         sceneAccess={['ch1_lodge_exploration']}

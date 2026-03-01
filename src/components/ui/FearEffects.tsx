@@ -1,37 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useGameStore } from '@/lib/store';
 
 export default function FearEffects() {
   const fearLevel = useGameStore((state) => state.fearLevel);
-  const [grainOpacity, setGrainOpacity] = useState(0);
   
-  useEffect(() => {
-    if (fearLevel > 30) {
-      setGrainOpacity(Math.min(0.15, (fearLevel - 30) / 400));
-    } else {
-      setGrainOpacity(0);
-    }
-  }, [fearLevel]);
-  
+  const grainOpacity = fearLevel > 30 ? Math.min(0.15, (fearLevel - 30) / 400) : 0;
   const vignetteIntensity = Math.min(0.7, fearLevel / 150);
   const vignetteColor = fearLevel > 70 ? 'rgba(80, 0, 0,' : 'rgba(0, 0, 0,';
-  
+
   return (
     <>
       {/* Vignette effect */}
-      <div 
-        className="fixed inset-0 pointer-events-none z-10"
+      <div
+        className="fixed inset-0 pointer-events-none z-10 transition-all duration-1000 ease-in-out"
         style={{
-          background: `${vignetteColor} ${vignetteIntensity})`,
-          boxShadow: fearLevel > 80 
-            ? 'inset 0 0 100px rgba(100, 0, 0, 0.5)' 
-            : 'none',
-          transition: 'all 0.5s ease-out',
+          background: `radial-gradient(circle, transparent 20%, ${vignetteColor}${vignetteIntensity}) 100%)`,
+          boxShadow: fearLevel > 80
+            ? 'inset 0 0 150px rgba(120, 0, 0, 0.6)'
+            : 'inset 0 0 100px rgba(0, 0, 0, 0.4)',
         }}
       />
-      
+
       {/* Screen grain */}
       {grainOpacity > 0 && (
         <div
@@ -44,15 +34,13 @@ export default function FearEffects() {
       )}
 
       {/* Red tint at high fear */}
-      {fearLevel > 70 && (
-        <div
-          className="fixed inset-0 pointer-events-none z-[15]"
-          style={{
-            background: `radial-gradient(circle, transparent 30%, rgba(60, 0, 0, ${(fearLevel - 70) / 100}) 100%)`,
-            transition: 'opacity 0.3s ease-out',
-          }}
-        />
-      )}
+      <div
+        className="fixed inset-0 pointer-events-none z-[15] transition-opacity duration-1000 ease-in-out"
+        style={{
+          background: 'rgba(80, 0, 0, 0.25)',
+          opacity: fearLevel > 70 ? (fearLevel - 70) / 60 : 0,
+        }}
+      />
     </>
   );
 }

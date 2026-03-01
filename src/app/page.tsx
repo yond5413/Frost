@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useGameStore } from '@/lib/store';
 import NarrativeDisplay from '@/components/ui/NarrativeDisplay';
@@ -9,11 +9,16 @@ import GameHUD from '@/components/ui/GameHUD';
 import JumpScare from '@/components/ui/JumpScare';
 import DontMoveQTE from '@/components/ui/DontMoveQTE';
 import ButterflyNotification from '@/components/ui/ButterflyNotification';
+import ButterflyEffectTracker from '@/components/ui/ButterflyEffectTracker';
 import StatusUpdateToast from '@/components/ui/StatusUpdateToast';
 import FearEffects from '@/components/ui/FearEffects';
 import SceneTitleCard from '@/components/ui/SceneTitleCard';
 import { LightningFlashEffect } from '@/components/three/LightningFlash';
 import CharacterDeathEffects from '@/components/ui/CharacterDeathEffects';
+import DeathRecap from '@/components/ui/DeathRecap';
+import PauseMenu from '@/components/ui/PauseMenu';
+import { useMusicSync } from '@/lib/musicManager';
+import { NarratorPersonality } from '@/lib/store';
 
 const GameScene = dynamic(() => import('@/components/three/GameScene'), { ssr: false });
 
@@ -27,22 +32,55 @@ const SNOW_PARTICLES = Array.from({ length: 20 }, (_, i) => ({
   animationDelay: `${(i * 0.7) % 5}s`,
 }));
 
+const PERSONALITY_OPTIONS: Array<{
+  id: NarratorPersonality;
+  glyph: string;
+  label: string;
+  desc: string;
+}> = [
+  { id: 'balanced', glyph: '⚖', label: 'Balanced', desc: 'Every consequence earns its weight.' },
+  { id: 'brutal',   glyph: '☠', label: 'Brutal',   desc: 'Survival is earned, not given.' },
+  { id: 'merciful', glyph: '🛡', label: 'Merciful', desc: 'Death is always a last resort.' },
+  { id: 'chaotic',  glyph: '⚡', label: 'Chaotic',  desc: 'Ignores patterns. Surprises always.' },
+];
+
 export default function GamePage() {
-  const { phase, setPhase, currentScene, setCurrentScene, setCurrentEnvironment, fearLevel, voiceEnabled, toggleVoice } =
+  const { phase, setPhase, currentScene, setCurrentScene, setCurrentEnvironment, fearLevel, jumpScareActive, voiceEnabled, toggleVoice, narratorPersonality, setNarratorPersonality, isPaused, togglePause, resetGame } =
     useGameStore();
 
+  useMusicSync(fearLevel, jumpScareActive);
+
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const prevPhaseRef = useRef(phase);
+
+  // Escape key toggles pause (only during active gameplay)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && phase !== 'intro') togglePause();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [phase, togglePause]);
 
   // Fade-to-black on scene change
   useEffect(() => {
-    if (phase === 'scene' || phase === 'choice') {
-      setIsTransitioning(true);
-      const t = setTimeout(() => setIsTransitioning(false), 500);
-      return () => clearTimeout(t);
+    const prevPhase = prevPhaseRef.current;
+    if ((phase === 'scene' || phase === 'choice') && prevPhase !== phase) {
+      const timer1 = setTimeout(() => setIsTransitioning(true), 0);
+      const timer2 = setTimeout(() => setIsTransitioning(false), 500);
+      prevPhaseRef.current = phase;
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
     }
-  }, [currentScene, phase]);
+    prevPhaseRef.current = phase;
+  }, [phase, currentScene]);
 
   const handleStart = () => {
+    const personality = narratorPersonality;
+    resetGame();
+    setNarratorPersonality(personality);
     setPhase('scene');
     setCurrentEnvironment('lodge');
     setCurrentScene('prologue_start');
@@ -127,7 +165,7 @@ export default function GamePage() {
           {/* Voice toggle */}
           <button
             onClick={toggleVoice}
-            className="relative z-10 w-56 px-8 py-3 text-xs tracking-[0.3em] uppercase transition-all duration-300 mb-3"
+            className="relative z-10 w-56 px-8 py-3 text-xs tracking-[0.3em] uppercase transition-all duration-300 mb-6"
             style={{
               border: voiceEnabled ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(75,85,99,0.3)',
               color: voiceEnabled ? 'rgba(252,165,165,0.8)' : 'rgba(107,114,128,0.6)',
@@ -135,6 +173,28 @@ export default function GamePage() {
           >
             Voice: {voiceEnabled ? 'On' : 'Off'}
           </button>
+
+          {/* Narrator personality selector */}
+          <div className="relative z-10 flex gap-2 mb-6">
+            {PERSONALITY_OPTIONS.map((opt) => {
+              const isSelected = narratorPersonality === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => setNarratorPersonality(opt.id)}
+                  className="flex flex-col items-center px-3 py-2.5 w-28 transition-all duration-200"
+                  style={{
+                    border: isSelected ? '1px solid rgba(255,255,255,0.35)' : '1px solid rgba(75,85,99,0.25)',
+                    background: isSelected ? 'rgba(255,255,255,0.04)' : 'transparent',
+                  }}
+                >
+                  <span className="text-lg mb-1">{opt.glyph}</span>
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-gray-300 mb-1">{opt.label}</span>
+                  <span className="text-[9px] text-gray-600 italic text-center leading-tight">{opt.desc}</span>
+                </button>
+              );
+            })}
+          </div>
 
           {/* Dev skip */}
           <button
@@ -152,10 +212,13 @@ export default function GamePage() {
       <DontMoveQTE />
       <JumpScare />
       <ButterflyNotification />
+      <ButterflyEffectTracker />
       <StatusUpdateToast />
       <FearEffects />
       <LightningFlashEffect />
       <CharacterDeathEffects />
+      <DeathRecap />
+      {isPaused && <PauseMenu />}
     </main>
   );
 }

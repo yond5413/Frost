@@ -3,7 +3,6 @@
 import dynamic from 'next/dynamic';
 import { useGameStore } from '@/lib/store';
 import type { EnvironmentType } from '@/lib/environmentStore';
-import { Stars } from '@react-three/drei';
 
 const Atmosphere = dynamic(() => import('@/components/three/shared/Atmosphere'), { ssr: false });
 const Cabin = dynamic(() => import('@/components/three/environments/Cabin'), { ssr: false });
@@ -11,11 +10,7 @@ const LodgeInterior = dynamic(() => import('@/components/three/environments/Lodg
 const ExpandedWoods = dynamic(() => import('@/components/three/environments/ExpandedWoods'), { ssr: false });
 const MinesEnvironment = dynamic(() => import('@/components/three/environments/MinesEnvironment'), { ssr: false });
 
-interface EnvironmentManagerProps {
-  showCharacters?: boolean;
-}
-
-export default function EnvironmentManager({ showCharacters = true }: EnvironmentManagerProps) {
+export default function EnvironmentManager() {
   const currentEnvironment = useGameStore((state) => state.currentEnvironment) as EnvironmentType;
 
   const renderEnvironment = () => {
@@ -67,9 +62,6 @@ export default function EnvironmentManager({ showCharacters = true }: Environmen
   return (
     <>
       <Atmosphere environment={currentEnvironment} />
-      {currentEnvironment !== 'mines' && (
-        <Stars radius={100} depth={50} count={2000} factor={4} fade speed={0.5} />
-      )}
       {renderEnvironment()}
       {currentEnvironment === 'cabin' && <SnowGround />}
     </>

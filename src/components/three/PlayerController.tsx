@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
 import { useGameStore } from '@/lib/store';
 
 const MOVE_SPEED = 4; // units per second
@@ -14,7 +13,7 @@ const SCENE_BOUNDS: Record<string, { x: [number, number]; z: [number, number] }>
 const DEFAULT_BOUNDS = { x: [-15, 15] as [number, number], z: [-15, 15] as [number, number] };
 
 export default function PlayerController() {
-  const { activeCharacter, characterPositions, setCharacterPosition, setCharacterAnimation, phase, currentScene, currentEnvironment } = useGameStore();
+  const { activeCharacter, characterPositions, setCharacterPosition, setCharacterAnimation, phase, currentEnvironment } = useGameStore();
   const [keys, setKeys] = useState<Record<string, boolean>>({});
   const lastUpdateRef = useRef(0);
 

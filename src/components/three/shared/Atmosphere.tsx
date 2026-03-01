@@ -90,7 +90,7 @@ function DefaultAtmosphere() {
 
   const fearRatio = fearLevel / 100;
 
-  const ambientIntensity = Math.max(0.04, 0.22 - fearRatio * 0.18);
+  const ambientIntensity = Math.max(0.08, 0.35 - fearRatio * 0.25);
   const pointIntensity = 0.6 + fearRatio * 0.4;
   const fogDensity = 35 - fearRatio * 20;
   const fogColor = fearRatio > 0.5 ? '#050508' : '#0a0c12';
@@ -126,7 +126,7 @@ function DefaultAtmosphere() {
 function MinesAtmosphere() {
   const fearLevel = useGameStore((state) => state.fearLevel);
   const fearRatio = fearLevel / 100;
-  
+
   return (
     <>
       <fog attach="fog" args={['#050505', 0.5, 10]} />
@@ -150,7 +150,7 @@ function LodgeAtmosphere() {
   });
 
   const fogColor = fearRatio > 0.5 ? '#0a0808' : '#151010';
-  const ambientIntensity = Math.max(0.05, 0.28 - fearRatio * 0.23);
+  const ambientIntensity = Math.max(0.12, 0.45 - fearRatio * 0.3);
 
   return (
     <>

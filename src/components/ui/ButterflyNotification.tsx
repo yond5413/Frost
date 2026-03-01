@@ -11,12 +11,15 @@ export default function ButterflyNotification() {
 
     useEffect(() => {
         if (activeConsequence && activeConsequence.startsWith('butterfly_')) {
-            setIsVisible(true);
-            const timer = setTimeout(() => {
+            const showTimer = setTimeout(() => setIsVisible(true), 0);
+            const hideTimer = setTimeout(() => {
                 setIsVisible(false);
                 clearActiveConsequence();
             }, 5000);
-            return () => clearTimeout(timer);
+            return () => {
+                clearTimeout(showTimer);
+                clearTimeout(hideTimer);
+            };
         }
     }, [activeConsequence, clearActiveConsequence]);
 
