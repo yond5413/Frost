@@ -7,6 +7,11 @@ interface StoryGenerationOptions {
   fearLevel?: number;
   clues?: string[];
   customPrompt?: string;
+  // NEW: Enhanced context
+  relationships?: Record<string, Record<string, number>>;
+  characterTraits?: Record<string, Record<string, number>>;
+  butterflyEffects?: Record<string, string>;
+  activeCharacter?: string;
 }
 
 interface GeneratedStory {
@@ -15,6 +20,26 @@ interface GeneratedStory {
     id: string;
     text: string;
     nextScene: string;
+    fearDelta?: number;
+    consequence?: string;
+    triggerQTE?: boolean;
+  }>;
+  // NEW: AI decision fields
+  characterDeath?: string;  // e.g., 'jessica'
+  butterflyEffect?: {
+    id: string;
+    choice: string;
+  };
+  relationshipChanges?: Array<{
+    character1: string;
+    character2: string;
+    delta: number;
+  }>;
+  sceneTransition?: string;
+  dialogueLines?: Array<{
+    speaker: string;
+    text: string;
+    mood?: string;
   }>;
 }
 
@@ -37,6 +62,11 @@ export function useMistralAI() {
           fearLevel: options.fearLevel ?? 0,
           clues: options.clues ?? [],
           customPrompt: options.customPrompt,
+          // NEW context
+          relationships: options.relationships ?? {},
+          characterTraits: options.characterTraits ?? {},
+          butterflyEffects: options.butterflyEffects ?? {},
+          activeCharacter: options.activeCharacter ?? 'sam',
         }),
       });
 

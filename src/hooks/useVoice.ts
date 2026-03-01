@@ -125,9 +125,9 @@ export function useVoiceInput() {
 export function useElevenLabs() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   
-  const speak = useCallback(async (text: string) => {
+  const speak = useCallback(async (text: string, voiceId?: string) => {
     const apiKey = process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY;
-    const voiceId = process.env.NEXT_PUBLIC_ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
+    const resolvedId = voiceId || process.env.NEXT_PUBLIC_ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
     
     if (!apiKey) {
       console.warn('ElevenLabs API key not configured');
@@ -138,7 +138,7 @@ export function useElevenLabs() {
     
     try {
       const response = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        `https://api.elevenlabs.io/v1/text-to-speech/${resolvedId}`,
         {
           method: 'POST',
           headers: {

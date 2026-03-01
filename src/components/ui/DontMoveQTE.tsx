@@ -1,53 +1,56 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/lib/store';
 
 export default function DontMoveQTE() {
     const { qteActive, passQTE, failQTE, fearLevel } = useGameStore();
-    const [timeLeft, setTimeLeft] = useState(5); // Baseline 5 seconds
+    const [timeLeft, setTimeLeft] = useState(5);
     const [isFailed, setIsFailed] = useState(false);
-
-    // Shrink the safe zone based on how high the fear level is
-    const safeZoneSize = Math.max(80, 200 - fearLevel);
+    const [shakeOffset, setShakeOffset] = useState({ x: 0, y: 0 });
+    const shakeRef = useRef<number>(0);
+    
+    const safeZoneSize = Math.max(60, 180 - fearLevel * 1.2);
+    const timerDuration = Math.max(2, 5 - fearLevel / 30);
 
     useEffect(() => {
         if (!qteActive || isFailed) return;
 
-        // Reset timer when QTE starts
-        setTimeLeft(5 + (fearLevel / 50));
+        setTimeLeft(timerDuration);
 
         const handleMouseMove = (e: MouseEvent) => {
-            // Get exact center of the screen
             const centerX = window.innerWidth / 2;
             const centerY = window.innerHeight / 2;
-
-            // Calculate bounds
             const halfSize = safeZoneSize / 2;
-            const leftBound = centerX - halfSize;
-            const rightBound = centerX + halfSize;
-            const topBound = centerY - halfSize;
-            const bottomBound = centerY + halfSize;
-
-            // Fail condition
+            
             if (
-                e.clientX < leftBound ||
-                e.clientX > rightBound ||
-                e.clientY < topBound ||
-                e.clientY > bottomBound
+                e.clientX < centerX - halfSize ||
+                e.clientX > centerX + halfSize ||
+                e.clientY < centerY - halfSize ||
+                e.clientY > centerY + halfSize
             ) {
                 setIsFailed(true);
-                setTimeout(() => failQTE(), 1000); // 1 sec delay to show failure
+                setTimeout(() => failQTE(), 1200);
             }
         };
 
         window.addEventListener('mousemove', handleMouseMove);
 
-        // Timer countdown
+        const startShake = Date.now();
+        const shakeInterval = setInterval(() => {
+            const elapsed = Date.now() - startShake;
+            const intensity = Math.min(8, elapsed / 200);
+            setShakeOffset({
+                x: (Math.random() - 0.5) * intensity,
+                y: (Math.random() - 0.5) * intensity,
+            });
+        }, 30);
+
         const timer = setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 0.1) {
                     clearInterval(timer);
+                    clearInterval(shakeInterval);
                     passQTE();
                     return 0;
                 }
@@ -58,47 +61,81 @@ export default function DontMoveQTE() {
         return () => {
             window.removeEventListener('mousemove', handleMouseMove);
             clearInterval(timer);
+            clearInterval(shakeInterval);
+            setShakeOffset({ x: 0, y: 0 });
         };
-    }, [qteActive, fearLevel, isFailed, failQTE, passQTE, safeZoneSize]);
+    }, [qteActive, fearLevel, isFailed, failQTE, passQTE, safeZoneSize, timerDuration]);
 
-    // Reset state when QTE deactivates
     useEffect(() => {
         if (!qteActive) {
             setIsFailed(false);
+            setShakeOffset({ x: 0, y: 0 });
         }
     }, [qteActive]);
 
     if (!qteActive) return null;
 
-    return (
-        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
-            {/* Terrifying overlay */}
-            <div className="absolute inset-0 bg-red-900/10 animate-pulse pointer-events-none" />
+    const progressPercent = (timeLeft / timerDuration) * 100;
 
-            {/* Safe Zone Visualizer */}
+    return (
+        <div 
+            className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+            style={{
+                transform: `translate(${shakeOffset.x}px, ${shakeOffset.y}px)`,
+                transition: 'transform 0.03s ease-out',
+            }}
+        >
+            <div className="absolute inset-0 bg-red-900/20 animate-pulse" />
+            
             <div
-                className={`absolute border-2 ${isFailed ? 'border-red-600 bg-red-900/40' : 'border-white/50 bg-white/5'} transition-colors duration-100`}
+                className={`absolute border-2 ${isFailed ? 'border-red-600 bg-red-900/60' : 'border-red-500/70 bg-red-900/20'} transition-all duration-150`}
                 style={{
                     width: `${safeZoneSize}px`,
                     height: `${safeZoneSize}px`,
                     left: '50%',
                     top: '50%',
                     transform: 'translate(-50%, -50%)',
-                    boxShadow: isFailed ? '0 0 50px rgba(220,38,38,0.8)' : '0 0 20px rgba(255,255,255,0.2)'
+                    boxShadow: isFailed 
+                        ? '0 0 80px rgba(220,38,38,1), inset 0 0 30px rgba(220,38,38,0.5)' 
+                        : '0 0 30px rgba(220,38,38,0.5), inset 0 0 15px rgba(220,38,38,0.3)',
                 }}
             />
+            
+            {!isFailed && (
+                <div 
+                    className="absolute border-t-2 border-red-500"
+                    style={{
+                        width: `${safeZoneSize - 20}px`,
+                        top: `${50 - (progressPercent / 2)}%`,
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        opacity: 0.6,
+                    }}
+                />
+            )}
 
-            <div className="absolute top-1/4 text-center">
-                <h2 className={`text-6xl font-black uppercase tracking-[0.2em] ${isFailed ? 'text-red-600' : 'text-white'} animate-pulse`}>
+            <div className="absolute top-[15%] text-center">
+                <h2 className={`text-7xl font-black uppercase tracking-[0.3em] ${isFailed ? 'text-red-600' : 'text-red-500'} animate-pulse`}>
                     {isFailed ? 'DETECTED' : "DON'T MOVE"}
                 </h2>
                 {!isFailed && (
-                    <p className="text-white mt-4 font-mono text-xl">
-                        {(Math.max(0, timeLeft)).toFixed(1)}s
-                    </p>
+                    <div className="mt-6">
+                        <div className="w-64 h-3 bg-red-900/50 rounded-full overflow-hidden border border-red-700/50">
+                            <div 
+                                className="h-full bg-red-600 transition-all duration-100"
+                                style={{ width: `${progressPercent}%` }}
+                            />
+                        </div>
+                        <p className="text-red-400 mt-3 font-mono text-2xl">
+                            {timeLeft.toFixed(1)}s
+                        </p>
+                    </div>
                 )}
             </div>
 
-        </div >
+            {isFailed && (
+                <div className="absolute inset-0 bg-red-900/40 animate-pulse" />
+            )}
+        </div>
     );
 }

@@ -30,7 +30,6 @@ const SNOW_VERT = `
 const SNOW_FRAG = `
   varying vec3 vColor;
   void main() {
-    // create a soft circle
     float dist = distance(gl_PointCoord, vec2(0.5));
     if (dist > 0.5) discard;
     gl_FragColor = vec4(vColor, 1.0 - (dist * 2.0));
@@ -54,7 +53,7 @@ function DefaultAtmosphere() {
       positions[i * 3] = (seededRandom() - 0.5) * 60;
       positions[i * 3 + 1] = seededRandom() * 30;
       positions[i * 3 + 2] = (seededRandom() - 0.5) * 60;
-      sizes[i] = 3 + seededRandom() * 6; // 3–9 px
+      sizes[i] = 3 + seededRandom() * 6;
     }
     return { positions, sizes };
   }, []);
@@ -75,11 +74,10 @@ function DefaultAtmosphere() {
     const pos = snowRef.current.geometry.attributes.position.array as Float32Array;
     const count = pos.length / 3;
 
-    // Snow falls faster based on fear
-    const fallSpeed = 2 + (fearLevel / 100) * 4;
+    const fallSpeed = 2 + (fearLevel / 100) * 6;
 
     for (let i = 0; i < count; i++) {
-      pos[i * 3] += delta * 0.8; // wind drift
+      pos[i * 3] += delta * 1.2;
       pos[i * 3 + 1] -= delta * fallSpeed;
       if (pos[i * 3 + 1] < 0) {
         pos[i * 3 + 1] = 30;
@@ -90,34 +88,29 @@ function DefaultAtmosphere() {
     snowRef.current.geometry.attributes.position.needsUpdate = true;
   });
 
-  // Calculate dynamic colors and intensities based on fear
   const fearRatio = fearLevel / 100;
 
-  // As fear rises, ambient drops and fog densifies/darkens
-  const ambientIntensity = Math.max(0.02, 0.15 - fearRatio * 0.1);
-  const pointIntensity = 0.5 + fearRatio * 0.5; // Fire/lamp gets slightly stronger/harsher
-  const fogDensity = 50 - fearRatio * 30; // Fog gets closer
-
-  // To interpolate hex colors efficiently in standard React-Three, we use math.
-  // Base fog: '#1a2030' vs High fear fog: '#0a0a0d'
+  const ambientIntensity = Math.max(0.01, 0.08 - fearRatio * 0.06);
+  const pointIntensity = 0.4 + fearRatio * 0.3;
+  const fogDensity = 35 - fearRatio * 20;
+  const fogColor = fearRatio > 0.5 ? '#050508' : '#0a0c12';
 
   return (
     <>
-      {/* Dynamic fog based on fear level */}
-      <fog attach="fog" args={['#101520', 10, fogDensity]} />
-      <ambientLight intensity={ambientIntensity} color="#4a6080" />
+      <fog attach="fog" args={[fogColor, 8, fogDensity]} />
+      <ambientLight intensity={ambientIntensity} color="#2a3550" />
       <directionalLight
         position={[10, 15, 5]}
-        intensity={0.3}
-        color="#8899bb"
+        intensity={0.15 * (1 - fearRatio * 0.5)}
+        color="#556688"
         castShadow
         shadow-mapSize={[2048, 2048]}
       />
       <pointLight
         position={[0, 2, 2]}
         intensity={pointIntensity}
-        color={fearLevel > 70 ? "#ff5500" : "#ff9944"}
-        distance={8}
+        color={fearLevel > 60 ? "#ff3300" : "#cc6633"}
+        distance={6}
         decay={2}
       />
       <points ref={snowRef} material={snowMaterial}>
@@ -131,33 +124,44 @@ function DefaultAtmosphere() {
 }
 
 function MinesAtmosphere() {
+  const fearLevel = useGameStore((state) => state.fearLevel);
+  const fearRatio = fearLevel / 100;
+  
   return (
     <>
-      <fog attach="fog" args={['#0a0a0a', 1, 15]} />
-      <ambientLight intensity={0.05} color="#1a1a2e" />
-      <pointLight position={[0, 3, 0]} intensity={0.8} color="#ff6600" distance={10} decay={2} />
-      <pointLight position={[-5, 2, -5]} intensity={0.3} color="#ff4400" distance={8} decay={2} />
-      <pointLight position={[5, 2, 5]} intensity={0.3} color="#ff4400" distance={8} decay={2} />
+      <fog attach="fog" args={['#050505', 0.5, 10]} />
+      <ambientLight intensity={0.02} color="#0a0a15" />
+      <pointLight position={[0, 3, 0]} intensity={0.6 * (1 + fearRatio * 0.5)} color="#ff4400" distance={8} decay={2} />
+      <pointLight position={[-5, 2, -5]} intensity={0.2} color="#ff2200" distance={6} decay={2} />
+      <pointLight position={[5, 2, 5]} intensity={0.2} color="#ff2200" distance={6} decay={2} />
     </>
   );
 }
 
 function LodgeAtmosphere() {
   const fireRef = useRef<THREE.PointLight>(null);
+  const fearLevel = useGameStore((state) => state.fearLevel);
+  const fearRatio = fearLevel / 100;
 
   useFrame(() => {
     if (fireRef.current) {
-      fireRef.current.intensity = 1.2 + Math.sin(Date.now() * 0.01) * 0.3 + Math.random() * 0.1;
+      fireRef.current.intensity = 1.0 + Math.sin(Date.now() * 0.01) * 0.3 + Math.random() * 0.1;
     }
   });
 
+  const fogColor = fearRatio > 0.5 ? '#0a0808' : '#151010';
+  const ambientIntensity = Math.max(0.02, 0.06 - fearRatio * 0.04);
+
   return (
     <>
-      <fog attach="fog" args={['#1a1520', 15, 40]} />
-      <ambientLight intensity={0.1} color="#3a2a20" />
-      <pointLight ref={fireRef} position={[0, 2, -2]} intensity={1.2} color="#ff6633" distance={12} decay={2} />
-      <pointLight position={[4, 2, 2]} intensity={0.15} color="#ffaa66" distance={6} decay={2} />
-      <pointLight position={[-4, 2, 2]} intensity={0.15} color="#ffaa66" distance={6} decay={2} />
+      <fog attach="fog" args={[fogColor, 10, 30 - fearRatio * 10]} />
+      <ambientLight intensity={ambientIntensity} color="#1a1510" />
+      <pointLight ref={fireRef} position={[0, 2, -2]} intensity={1.0} color="#ff4400" distance={10} decay={2} />
+      <pointLight position={[4, 2, 2]} intensity={0.1} color="#ff8822" distance={5} decay={2} />
+      <pointLight position={[-4, 2, 2]} intensity={0.1} color="#ff8822" distance={5} decay={2} />
+      {fearLevel > 50 && (
+        <pointLight position={[0, 3, 3]} intensity={0.05} color="#330000" distance={4} decay={2} />
+      )}
     </>
   );
 }

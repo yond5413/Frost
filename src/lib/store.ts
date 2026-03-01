@@ -16,15 +16,39 @@ export interface Scene {
   id: string;
   title: string;
   description: string;
-  narratorText?: string;
-  speaker?: string;
-  choices?: Choice[];
+  dialogue: DialogueLine[];
+  choices?: Choice[];  // Legacy/fallback, or can be used with choicesAt
+  choicesAt?: number;  // Index in dialogue array where choices appear
   cameraPosition?: [number, number, number];
+  cameraTarget?: [number, number, number]; // Point camera looks at
+  cameraControls?: boolean; // Allow user to override camera with arrow keys
+  interactables?: Array<{
+    id: string;
+    position: [number, number, number];
+    label: string;
+    targetScene: string;
+  }>;
   environment?: 'cabin' | 'woods' | 'mines' | 'lodge';
   activeCharacter?: string;
+  aiDriven?: boolean; // NEW: AI generates outcome for this scene
+  // Legacy support while migrating
+  narratorText?: string;
+  speaker?: string;
 }
 
-export type AnimationType = 'idle' | 'walk';
+export type AnimationType = 'idle' | 'walk' | 'talking' | 'gesture_angry' | 'gesture_happy' | 'gesture_sad' | 'gesture_scared' | 'shock' | 'fear';
+
+export type CameraShot = 'speaker' | 'wide' | 'medium' | 'closeup' | 'over_shoulder' | 'pov' | 'tracking' | 'panic' | 'freeze' | 'flicker';
+
+export interface DialogueLine {
+  speaker: string;  // character ID or 'narrator'
+  text: string;
+  mood?: 'neutral' | 'happy' | 'angry' | 'sad' | 'scared' | 'nervous' | 'determined' | 'serious' | 'warning' | 'somber' | 'hopeful';
+  animation?: AnimationType;
+  camera?: CameraShot;
+  duration?: number;  // Optional: ms to display (default auto-calc)
+  fearDelta?: number;  // Optional: fear increase during this line
+}
 
 export interface CharacterPosition {
   x: number;
@@ -50,6 +74,8 @@ interface GameState {
   activeCharacter: string;
   wendigoActive: boolean;
   jumpScareActive: boolean;
+  currentSpeaker: string;
+  currentCameraShot: CameraShot;
 
   // Actions
   setPhase: (phase: GamePhase) => void;
@@ -72,12 +98,22 @@ interface GameState {
   triggerJumpScare: () => void;
   clearJumpScare: () => void;
   toggleVoice: () => void;
+  setCurrentSpeaker: (speaker: string) => void;
+  setCurrentCameraShot: (shot: CameraShot) => void;
 
   qteActive: boolean;
   _qteCallbacks: { pass: (() => void) | null, fail: (() => void) | null };
   triggerQTE: (onPass: () => void, onFail: () => void) => void;
   passQTE: () => void;
   failQTE: () => void;
+
+  applyAIChanges: (aiResponse: {
+    characterDeath?: string;
+    butterflyEffect?: { id: string; choice: string };
+    relationshipChanges?: Array<{ character1: string; character2: string; delta: number }>;
+  }) => void;
+  getRelationship: (char1: string, char2: string) => number;
+  getButterflyChoice: (segmentId: string) => string | undefined;
 
   resetGame: () => void;
 }
@@ -96,6 +132,8 @@ const initialState = {
     josh: 'alive',
     emily: 'alive',
     matt: 'alive',
+    hannah: 'alive',
+    beth: 'alive',
   } as Record<string, 'alive' | 'dead' | 'unknown'>,
   characterPositions: {
     sam: { x: -3, y: 0, z: 5 },
@@ -106,6 +144,8 @@ const initialState = {
     josh: { x: 2, y: 0, z: 7 },
     emily: { x: -4, y: 0, z: 4 },
     matt: { x: 4, y: 0, z: 4 },
+    hannah: { x: -2, y: 0, z: 2 },
+    beth: { x: 2, y: 0, z: 2 },
   } as Record<string, CharacterPosition>,
   characterAnimations: {
     sam: 'idle',
@@ -116,6 +156,8 @@ const initialState = {
     josh: 'idle',
     emily: 'idle',
     matt: 'idle',
+    hannah: 'idle',
+    beth: 'idle',
   } as Record<string, AnimationType>,
   clues: [],
   fearLevel: 0,
@@ -132,12 +174,21 @@ const initialState = {
     emily: { bravery: 50, honesty: 50, curious: 50 },
     matt: { bravery: 50, honesty: 50, curious: 50 },
   },
-  relationships: {},
+  relationships: {
+    sam_mike: { value: 60 },
+    sam_jessica: { value: 55 },
+    mike_jessica: { value: 70 },
+    chris_ashley: { value: 75 },
+    josh_sam: { value: 65 },
+    emily_matt: { value: 65 },
+  },
   activeCharacter: 'sam',
   wendigoActive: false,
   jumpScareActive: false,
   voiceEnabled: false,
   qteActive: false,
+  currentSpeaker: 'narrator',
+  currentCameraShot: 'wide' as CameraShot,
 };
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -213,6 +264,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   triggerJumpScare: () => set({ jumpScareActive: true }),
   clearJumpScare: () => set({ jumpScareActive: false }),
   toggleVoice: () => set((state) => ({ voiceEnabled: !state.voiceEnabled })),
+  setCurrentSpeaker: (speaker) => set({ currentSpeaker: speaker }),
+  setCurrentCameraShot: (shot) => set({ currentCameraShot: shot }),
 
   qteActive: false,
   _qteCallbacks: { pass: null as (() => void) | null, fail: null as (() => void) | null },
@@ -232,6 +285,44 @@ export const useGameStore = create<GameState>((set, get) => ({
     const { _qteCallbacks } = get() as GameState;
     set({ qteActive: false });
     if (_qteCallbacks?.fail) _qteCallbacks.fail();
+  },
+
+  applyAIChanges: (aiResponse: {
+    characterDeath?: string;
+    butterflyEffect?: { id: string; choice: string };
+    relationshipChanges?: Array<{ character1: string; character2: string; delta: number }>;
+  }) => {
+    const state = get();
+    
+    // Handle character death
+    if (aiResponse.characterDeath) {
+      state.updateCharacterState(aiResponse.characterDeath, 'dead');
+      state.addConsequence(`death_${aiResponse.characterDeath}`);
+    }
+    
+    // Handle butterfly effect
+    if (aiResponse.butterflyEffect) {
+      state.setButterflyEffect(aiResponse.butterflyEffect.id, aiResponse.butterflyEffect.choice);
+      state.addConsequence(`butterfly_${aiResponse.butterflyEffect.id}`);
+    }
+    
+    // Handle relationship changes
+    if (aiResponse.relationshipChanges) {
+      aiResponse.relationshipChanges.forEach(change => {
+        state.updateRelationship(change.character1, change.character2, change.delta);
+      });
+    }
+  },
+
+  getRelationship: (char1: string, char2: string): number => {
+    const state = get();
+    const key = [char1, char2].sort().join('_');
+    return (state.relationships[key] as any)?.value ?? 50;
+  },
+
+  getButterflyChoice: (segmentId: string): string | undefined => {
+    const state = get();
+    return state.butterflyEffects[segmentId];
   },
 
   resetGame: () => set(initialState),
