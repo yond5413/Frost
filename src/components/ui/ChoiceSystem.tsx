@@ -2,6 +2,7 @@
 
 import { Choice, useGameStore } from '@/lib/store';
 import { getScene } from '@/data/story';
+import { notifyStatusUpdate } from './StatusUpdateToast';
 
 interface ChoiceButtonProps {
   choice: Choice;
@@ -29,9 +30,28 @@ export default function ChoiceSystem() {
 
   const handleSelect = (choice: Choice) => {
     makeChoice(choice.id);
-    if (choice.consequence) {
-      console.log('Consequence:', choice.consequence);
+
+    // Handle Butterfly Effects
+    if (choice.consequence?.startsWith('butterfly_')) {
+      useGameStore.getState().setButterflyEffect(choice.id, choice.consequence);
+      useGameStore.getState().addConsequence(choice.consequence); // Trigger Notification
     }
+
+    // Handle Trait Updates (e.g., "sam:bravery:+10")
+    if (choice.consequence?.includes(':')) {
+      const parts = choice.consequence.split(':');
+      if (parts.length === 3) {
+        const [char, trait, delta] = parts;
+        useGameStore.getState().updateTrait(char, trait, parseInt(delta));
+        notifyStatusUpdate(`${char.toUpperCase()}: ${trait.toUpperCase()} ${delta.startsWith('+') ? 'Increased' : 'Decreased'}`, 'trait');
+      }
+    }
+
+    // Handle Fear
+    if (choice.fearDelta) {
+      useGameStore.getState().incrementFear(choice.fearDelta);
+    }
+
     setCurrentScene(choice.nextScene);
     setPhase('scene');
   };

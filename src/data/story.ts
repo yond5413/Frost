@@ -8,11 +8,12 @@ export const storyScenes: Record<string, Scene> = {
     description: 'The Washington Lodge, Blackwood Mountain',
     narratorText: 'February 2, 2014. A group of friends gathers at the Washington lodge for their annual winter getaway. But this night would change everything.',
     environment: 'lodge',
+    activeCharacter: 'sam',
     choices: [
       { id: 'prologue_continue', text: 'Continue', nextScene: 'prologue_night' },
     ],
   },
-  
+
   prologue_night: {
     id: 'prologue_night',
     title: 'The Prank',
@@ -24,7 +25,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'prologue_watch', text: 'Watch what happens next', nextScene: 'prologue_escape' },
     ],
   },
-  
+
   prologue_escape: {
     id: 'prologue_escape',
     title: 'Into the Woods',
@@ -36,7 +37,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'prologue_fall', text: 'Continue', nextScene: 'chapter1_start' },
     ],
   },
-  
+
   // CHAPTER 1 - PRESENT DAY
   chapter1_start: {
     id: 'chapter1_start',
@@ -50,32 +51,31 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch1_meet_josh', text: 'Find Josh', nextScene: 'ch1_meet_josh' },
     ],
   },
-  
+
   ch1_lodge_exploration: {
     id: 'ch1_lodge_exploration',
     title: 'Washington Lodge',
     description: 'The familiar yet eerie lodge',
-    narratorText: 'The lodge stands silent. Fresh snow covers the ground. Something feels... different. Wrong.',
+    narratorText: 'The lodge stands silent. Fresh snow covers the ground. Something feels... different. Wrong. (Click the glowing object to investigate)',
     environment: 'lodge',
     cameraPosition: [0, 2, 3],
-    choices: [
-      { id: 'ch1_find_clue', text: 'Search for clues', nextScene: 'ch1_clue_found', consequence: 'found_totem' },
-      { id: 'ch1_go_to_bed', text: 'Head to bed', nextScene: 'ch1_night_fall' },
-    ],
+    activeCharacter: 'sam',
+    choices: [], // Handled by 3D Interaction
   },
-  
+
   ch1_clue_found: {
     id: 'ch1_clue_found',
     title: 'A Strange Totem',
     description: 'You found a totems',
     narratorText: 'A guidance totem rests in the corner. It shows a vision—Emily handing Matt a flare gun. What does it mean?',
     environment: 'lodge',
+    activeCharacter: 'sam',
     choices: [
-      { id: 'ch1_take_totem', text: 'Take the totem', nextScene: 'ch1_night_fall', consequence: 'took_totem' },
+      { id: 'ch1_take_totem', text: 'Take the totem', nextScene: 'ch1_night_fall', consequence: 'butterfly_totem_taken' },
       { id: 'ch1_leave_totem', text: 'Leave it', nextScene: 'ch1_night_fall' },
     ],
   },
-  
+
   ch1_meet_josh: {
     id: 'ch1_meet_josh',
     title: 'Josh\'s Welcome',
@@ -84,11 +84,11 @@ export const storyScenes: Record<string, Scene> = {
     environment: 'lodge',
     cameraPosition: [2, 1.5, 3],
     choices: [
-      { id: 'ch1_josh_friendly', text: '"Happy to be here, Josh"', nextScene: 'ch1_night_fall', consequence: 'josh_trust_high' },
-      { id: 'ch1_josh_suspicious', text: '"What\'s really going on?"', nextScene: 'ch1_night_fall', consequence: 'josh_trust_low' },
+      { id: 'ch1_josh_friendly', text: '"Happy to be here, Josh"', nextScene: 'ch1_night_fall', consequence: 'sam:honesty:+10' },
+      { id: 'ch1_josh_suspicious', text: '"What\'s really going on?"', nextScene: 'ch1_night_fall', consequence: 'sam:honesty:-10' },
     ],
   },
-  
+
   ch1_night_fall: {
     id: 'ch1_night_fall',
     title: 'Night Falls',
@@ -101,21 +101,19 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch1_hide', text: 'Hide and wait', nextScene: 'chapter2_start_alt' },
     ],
   },
-  
+
   // CHAPTER 2
   chapter2_start: {
     id: 'chapter2_start',
     title: 'Chapter 2: The Disappearance',
     description: 'After the scream...',
-    narratorText: 'You rush toward the sound. Jessica\'s room is empty. The window is open. Snow trails lead into the darkness...',
+    narratorText: 'You rush toward the sound. Jessica\'s room is empty. The window is open. Snow trails lead into the darkness... (Click the window to investigate)',
     environment: 'cabin',
     cameraPosition: [3, 2, 3],
-    choices: [
-      { id: 'ch2_chase_outside', text: 'Chase into the woods', nextScene: 'ch2_woods_chase' },
-      { id: 'ch2_get_mike', text: 'Find Mike', nextScene: 'ch2_find_mike' },
-    ],
+    activeCharacter: 'mike',
+    choices: [], // Handled by 3D Interaction
   },
-  
+
   chapter2_start_alt: {
     id: 'chapter2_start_alt',
     title: 'Chapter 2: Hiding',
@@ -126,7 +124,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch2_search_together', text: 'Search together', nextScene: 'ch2_find_mike' },
     ],
   },
-  
+
   ch2_woods_chase: {
     id: 'ch2_woods_chase',
     title: 'The Woods',
@@ -136,10 +134,10 @@ export const storyScenes: Record<string, Scene> = {
     cameraPosition: [0, 3, 6],
     choices: [
       { id: 'ch2_run_cabin', text: 'Run back to cabin', nextScene: 'chapter3_start', fearDelta: 15 },
-      { id: 'ch2_fight_back', text: 'Stand your ground', nextScene: 'chapter3_fight', fearDelta: 25 },
+      { id: 'ch2_fight_back', text: 'Stand your ground (Don\'t Move)', nextScene: 'chapter3_fight', fearDelta: 25, triggerQTE: true },
     ],
   },
-  
+
   ch2_find_mike: {
     id: 'ch2_find_mike',
     title: 'Mike\'s Search',
@@ -151,7 +149,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch2_stay_behind', text: 'Stay at lodge', nextScene: 'chapter3_lodge' },
     ],
   },
-  
+
   chapter3_start: {
     id: 'chapter3_start',
     title: 'Chapter 3: Secrets',
@@ -163,7 +161,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch3_search_lodge', text: 'Search the lodge instead', nextScene: 'ch3_lodge_search' },
     ],
   },
-  
+
   chapter3_fight: {
     id: 'chapter3_fight',
     title: 'Confrontation',
@@ -174,7 +172,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch3_fight_continue', text: 'Continue', nextScene: 'chapter3_start', fearDelta: 20 },
     ],
   },
-  
+
   chapter3_lodge: {
     id: 'chapter3_lodge',
     title: 'Chapter 3: Alone',
@@ -186,7 +184,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch3_turn_around', text: 'Turn around', nextScene: 'chapter3_start' },
     ],
   },
-  
+
   ch3_spirit_scene: {
     id: 'ch3_spirit_scene',
     title: 'The Spirit Board',
@@ -198,7 +196,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch3_wait_it_out', text: 'Wait in terror', nextScene: 'chapter4_start', fearDelta: 25 },
     ],
   },
-  
+
   ch3_lodge_search: {
     id: 'ch3_lodge_search',
     title: 'Hidden Secrets',
@@ -210,7 +208,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch3_ignore', text: 'Ignore and continue', nextScene: 'chapter4_start' },
     ],
   },
-  
+
   // CHAPTER 4
   chapter4_start: {
     id: 'chapter4_start',
@@ -224,7 +222,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch4_doubt', text: 'Demand proof', nextScene: 'ch4_stranger_tells', fearDelta: 15 },
     ],
   },
-  
+
   ch4_stranger_tells: {
     id: 'ch4_stranger_tells',
     title: 'The Hunter\'s Warning',
@@ -235,7 +233,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch4_ask_survival', text: '"How do we survive?"', nextScene: 'chapter5_start' },
     ],
   },
-  
+
   // CHAPTER 5 - FINAL
   chapter5_start: {
     id: 'chapter5_start',
@@ -249,7 +247,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ch5_stay_together', text: 'Stay together', nextScene: 'ending_survival', fearDelta: 15 },
     ],
   },
-  
+
   ending_sacrifice: {
     id: 'ending_sacrifice',
     title: 'The Dawn',
@@ -261,7 +259,7 @@ export const storyScenes: Record<string, Scene> = {
       { id: 'ending_restart', text: 'Play Again', nextScene: 'prologue_start' },
     ],
   },
-  
+
   ending_survival: {
     id: 'ending_survival',
     title: 'Together Until Dawn',

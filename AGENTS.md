@@ -247,8 +247,9 @@ NEXT_PUBLIC_ELEVENLABS_VOICE_ID=your_voice_id
 
 ## Game Mechanics (From Sprint Plan)
 - Butterfly Effect: Track all player choices, feed to Mistral for dynamic consequences
-- 8 Characters: sam, mike, jessica, ashley, chris, josh, emily, matt
-- Fear Level: 0-100 scale, affects story intensity
+- **Active Character System**: The player takes control of specific characters during certain scenes (e.g., Playing as Sam in the lodge, then switching to Mike in the woods).
+- **8 Characters**: sam, mike, jessica, ashley, chris, josh, emily, matt, with an active character state.
+- **Fear Level**: 0-100 scale, affects story intensity and QTE difficulty.
 - Clues/Totems: Discoverable items that provide premonitions
 - Multiple Endings: Based on character survival + choices
 

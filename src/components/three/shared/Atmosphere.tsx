@@ -4,6 +4,7 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { EnvironmentType } from '@/lib/environmentStore';
+import { useGameStore } from '@/lib/store';
 
 interface AtmosphereProps {
   environment: EnvironmentType;
@@ -17,23 +18,28 @@ export default function Atmosphere({ environment }: AtmosphereProps) {
 
 const SNOW_VERT = `
   attribute float size;
+  varying vec3 vColor;
   void main() {
+    vColor = vec3(1.0);
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = size * (300.0 / -mvPosition.z);
+    gl_PointSize = size * (100.0 / -mvPosition.z);
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
 
 const SNOW_FRAG = `
+  varying vec3 vColor;
   void main() {
-    vec2 coord = gl_PointCoord - vec2(0.5);
-    if (dot(coord, coord) > 0.25) discard;
-    gl_FragColor = vec4(1.0, 1.0, 1.0, 0.75);
+    // create a soft circle
+    float dist = distance(gl_PointCoord, vec2(0.5));
+    if (dist > 0.5) discard;
+    gl_FragColor = vec4(vColor, 1.0 - (dist * 2.0));
   }
 `;
 
 function DefaultAtmosphere() {
   const snowRef = useRef<THREE.Points>(null);
+  const fearLevel = useGameStore((state) => state.fearLevel);
 
   const { positions, sizes } = useMemo(() => {
     const count = 3500;
@@ -68,9 +74,13 @@ function DefaultAtmosphere() {
     if (!snowRef.current) return;
     const pos = snowRef.current.geometry.attributes.position.array as Float32Array;
     const count = pos.length / 3;
+
+    // Snow falls faster based on fear
+    const fallSpeed = 2 + (fearLevel / 100) * 4;
+
     for (let i = 0; i < count; i++) {
       pos[i * 3] += delta * 0.8; // wind drift
-      pos[i * 3 + 1] -= delta * 2;
+      pos[i * 3 + 1] -= delta * fallSpeed;
       if (pos[i * 3 + 1] < 0) {
         pos[i * 3 + 1] = 30;
         pos[i * 3] = (Math.random() - 0.5) * 60;
@@ -80,10 +90,22 @@ function DefaultAtmosphere() {
     snowRef.current.geometry.attributes.position.needsUpdate = true;
   });
 
+  // Calculate dynamic colors and intensities based on fear
+  const fearRatio = fearLevel / 100;
+
+  // As fear rises, ambient drops and fog densifies/darkens
+  const ambientIntensity = Math.max(0.02, 0.15 - fearRatio * 0.1);
+  const pointIntensity = 0.5 + fearRatio * 0.5; // Fire/lamp gets slightly stronger/harsher
+  const fogDensity = 50 - fearRatio * 30; // Fog gets closer
+
+  // To interpolate hex colors efficiently in standard React-Three, we use math.
+  // Base fog: '#1a2030' vs High fear fog: '#0a0a0d'
+
   return (
     <>
-      <fog attach="fog" args={['#1a2030', 10, 50]} />
-      <ambientLight intensity={0.15} color="#4a6080" />
+      {/* Dynamic fog based on fear level */}
+      <fog attach="fog" args={['#101520', 10, fogDensity]} />
+      <ambientLight intensity={ambientIntensity} color="#4a6080" />
       <directionalLight
         position={[10, 15, 5]}
         intensity={0.3}
@@ -91,7 +113,13 @@ function DefaultAtmosphere() {
         castShadow
         shadow-mapSize={[2048, 2048]}
       />
-      <pointLight position={[0, 2, 2]} intensity={0.5} color="#ff9944" distance={8} decay={2} />
+      <pointLight
+        position={[0, 2, 2]}
+        intensity={pointIntensity}
+        color={fearLevel > 70 ? "#ff5500" : "#ff9944"}
+        distance={8}
+        decay={2}
+      />
       <points ref={snowRef} material={snowMaterial}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" args={[positions, 3]} />

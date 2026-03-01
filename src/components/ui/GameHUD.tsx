@@ -19,10 +19,10 @@ export default function GameHUD() {
         <div className="flex items-center gap-3">
           {fearLevel > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-red-500 font-mono">FEAR</span>
+              <span className={`text-xs font-mono transition-colors duration-500 ${fearLevel > 70 ? 'text-red-500 animate-pulse' : 'text-red-400'}`}>FEAR</span>
               <div className="w-24 h-2 bg-black/60 border border-red-900/50 rounded overflow-hidden">
                 <div
-                  className="h-full bg-red-600 transition-all duration-500"
+                  className={`h-full bg-red-600 transition-all duration-500 ${fearLevel > 70 ? 'animate-pulse' : ''}`}
                   style={{ width: `${fearLevel}%` }}
                 />
               </div>

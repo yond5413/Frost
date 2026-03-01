@@ -91,7 +91,7 @@ export default function NarrativeDisplay() {
     } else {
       startTypewriter(scene.narratorText || '');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScene]);
 
   // Voice narration fires when typewriter finishes and choices appear
@@ -99,7 +99,7 @@ export default function NarrativeDisplay() {
     if (showChoices && voiceEnabled && displayText) {
       speak(displayText);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showChoices, voiceEnabled]);
 
   const handleSkip = useCallback(() => {
@@ -132,8 +132,26 @@ export default function NarrativeDisplay() {
       }
     }
 
-    setCurrentScene(choice.nextScene);
-    setPhase('scene');
+    // Check for QTE
+    if (choice.triggerQTE) {
+      useGameStore.getState().triggerQTE(
+        () => {
+          // Success Callback
+          setCurrentScene(choice.nextScene);
+          setPhase('scene');
+        },
+        () => {
+          // Fail Callback (Death handling could be added later, for now we just jump to a bad scene or spike fear)
+          incrementFear(30);
+          setCurrentScene(choice.nextScene); // Still progress them for now
+          setPhase('scene');
+        }
+      );
+      setPhase('exploration'); // Temporarily hide narrative to show QTE overlay cleanly
+    } else {
+      setCurrentScene(choice.nextScene);
+      setPhase('scene');
+    }
   };
 
   const speakerId = scene.speaker || 'narrator';
@@ -185,11 +203,10 @@ export default function NarrativeDisplay() {
                         e.stopPropagation();
                         handleChoiceSelect(choice);
                       }}
-                      className={`block w-full max-w-xl p-4 text-left transition-all duration-300 rounded font-medium ${
-                        isHighRisk
+                      className={`block w-full max-w-xl p-4 text-left transition-all duration-300 rounded font-medium ${isHighRisk
                           ? 'bg-red-950/80 border border-red-500 hover:bg-red-800/80 hover:border-red-400 text-red-200'
                           : 'bg-black/60 border border-red-900/50 hover:bg-red-900/40 hover:border-red-600 text-gray-100'
-                      }`}
+                        }`}
                     >
                       {isHighRisk && (
                         <span className="text-red-400 text-xs font-mono mr-2 animate-pulse">[HIGH RISK]</span>

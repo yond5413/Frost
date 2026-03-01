@@ -5,6 +5,7 @@ interface StoryGenerationOptions {
   playerChoices: string[];
   characterStates: Record<string, 'alive' | 'dead' | 'unknown'>;
   fearLevel?: number;
+  clues?: string[];
   customPrompt?: string;
 }
 
@@ -34,6 +35,7 @@ export function useMistralAI() {
           playerChoices: options.playerChoices,
           characterStates: options.characterStates,
           fearLevel: options.fearLevel ?? 0,
+          clues: options.clues ?? [],
           customPrompt: options.customPrompt,
         }),
       });

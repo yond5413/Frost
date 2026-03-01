@@ -3,11 +3,13 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import InteractableObject from '../InteractableObject';
+import { useGameStore } from '@/lib/store';
 
 export default function LodgeInterior() {
   const fireRef = useRef<THREE.Mesh>(null);
   const fireLightRef = useRef<THREE.PointLight>(null);
-  
+
   useFrame(() => {
     if (fireRef.current) {
       fireRef.current.scale.y = 1 + Math.sin(Date.now() * 0.02) * 0.2 + Math.random() * 0.1;
@@ -24,26 +26,26 @@ export default function LodgeInterior() {
         <boxGeometry args={[12, 0.3, 10]} />
         <meshStandardMaterial color="#2a1a0a" roughness={0.9} />
       </mesh>
-      
+
       <mesh position={[0, 5, 0]} receiveShadow>
         <boxGeometry args={[12, 0.3, 10]} />
         <meshStandardMaterial color="#2a1a0a" roughness={0.9} />
       </mesh>
-      
+
       {[-5.85, 5.85].map((x, i) => (
         <mesh key={`wall-${i}`} position={[x, 2.5, 0]} receiveShadow>
           <boxGeometry args={[0.3, 5, 10]} />
           <meshStandardMaterial color="#3d2817" roughness={0.8} />
         </mesh>
       ))}
-      
+
       {[-4.85, 4.85].map((z, i) => (
         <mesh key={`wall2-${i}`} position={[0, 2.5, z]} receiveShadow>
           <boxGeometry args={[12, 5, 0.3]} />
           <meshStandardMaterial color="#3d2817" roughness={0.8} />
         </mesh>
       ))}
-      
+
       <group position={[0, 0, -3]}>
         <mesh position={[0, 0.5, 0]}>
           <boxGeometry args={[2, 1, 0.8]} />
@@ -51,8 +53,8 @@ export default function LodgeInterior() {
         </mesh>
         <mesh ref={fireRef} position={[0, 1.2, 0]}>
           <coneGeometry args={[0.4, 1, 8]} />
-          <meshStandardMaterial 
-            color="#ff4400" 
+          <meshStandardMaterial
+            color="#ff4400"
             emissive="#ff2200"
             emissiveIntensity={2}
           />
@@ -63,37 +65,37 @@ export default function LodgeInterior() {
         </mesh>
         <pointLight ref={fireLightRef} position={[0, 1.5, 0]} intensity={2} color="#ff6633" distance={10} decay={2} />
       </group>
-      
+
       <mesh position={[-4, 1.5, -4.7]}>
         <boxGeometry args={[1.5, 2, 0.1]} />
         <meshStandardMaterial color="#2a1a0a" roughness={0.6} />
       </mesh>
       <mesh position={[-4, 2.5, -4.65]}>
         <boxGeometry args={[1.2, 0.8, 0.05]} />
-        <meshStandardMaterial 
-          color="#1a2030" 
-          emissive="#ffeecc" 
+        <meshStandardMaterial
+          color="#1a2030"
+          emissive="#ffeecc"
           emissiveIntensity={0.4}
-          transparent 
+          transparent
           opacity={0.7}
         />
       </mesh>
-      
+
       <mesh position={[4, 1.5, -4.7]}>
         <boxGeometry args={[1.5, 2, 0.1]} />
         <meshStandardMaterial color="#2a1a0a" roughness={0.6} />
       </mesh>
       <mesh position={[4, 2.5, -4.65]}>
         <boxGeometry args={[1.2, 0.8, 0.05]} />
-        <meshStandardMaterial 
-          color="#1a2030" 
-          emissive="#ffeecc" 
+        <meshStandardMaterial
+          color="#1a2030"
+          emissive="#ffeecc"
           emissiveIntensity={0.4}
-          transparent 
+          transparent
           opacity={0.7}
         />
       </mesh>
-      
+
       {[-3, 0, 3].map((z, i) => (
         <group key={`couch-${i}`} position={[3, 0.4, z]}>
           <mesh position={[0, 0, 0]} castShadow>
@@ -106,7 +108,7 @@ export default function LodgeInterior() {
           </mesh>
         </group>
       ))}
-      
+
       {[-2, 2].map((x, i) => (
         <group key={`chair-${i}`} position={[x, 0.5, 3]}>
           <mesh position={[0, 0, 0]} castShadow>
@@ -119,7 +121,7 @@ export default function LodgeInterior() {
           </mesh>
         </group>
       ))}
-      
+
       <mesh position={[-3, 0.3, -2]} receiveShadow>
         <cylinderGeometry args={[0.4, 0.5, 0.6, 12]} />
         <meshStandardMaterial color="#2a1a0a" />
@@ -132,6 +134,25 @@ export default function LodgeInterior() {
         <cylinderGeometry args={[0.2, 0.3, 0.6, 12]} />
         <meshStandardMaterial color="#2a1a0a" />
       </mesh>
+
+      {/* Interactable: Totem */}
+      <InteractableObject
+        id="lodge_totem"
+        label="Examine Totem"
+        position={[-3, 2.0, -2]} // On top of the table
+        sceneAccess={['ch1_lodge_exploration']}
+        onInteract={() => {
+          useGameStore.getState().addClue('Guidance Totem: Flare Gun');
+          useGameStore.getState().setCurrentScene('ch1_clue_found');
+          useGameStore.getState().setPhase('scene');
+        }}
+      >
+        <mesh>
+          <cylinderGeometry args={[0.1, 0.1, 0.3, 5]} />
+          <meshStandardMaterial color="#7a5c43" roughness={1} />
+        </mesh>
+      </InteractableObject>
+
     </group>
   );
 }

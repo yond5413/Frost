@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  const { currentScene, playerChoices, characterStates, fearLevel } = await request.json();
+  const { currentScene, playerChoices, characterStates, fearLevel, clues } = await request.json();
 
   const apiKey = process.env.MISTRAL_API_KEY;
   if (!apiKey) {
@@ -19,7 +19,8 @@ The game is set on Blackwood Mountain where supernatural creatures (Wendigos) hu
 Current scene: ${currentScene}
 Previous choices: ${(playerChoices as string[]).join(', ') || 'None'}
 Survivors still alive: ${aliveChars || 'unknown'}
-Fear level: ${fearLevel}/100 — ${fearLevel > 70 ? 'EXTREME TERROR' : fearLevel > 40 ? 'HIGH DREAD' : 'uneasy tension'}
+Clues found so far: ${(clues as string[])?.join(', ') || 'None'}
+Fear level: ${fearLevel}/100 — ${fearLevel > 70 ? 'EXTREME TERROR. Make the narration visceral, panicked, and terrifying.' : fearLevel > 40 ? 'HIGH DREAD. Make the narration suspenseful and creepy.' : 'uneasy tension. Make the narration unsettling.'}
 
 Write in a tense, cinematic horror style. Keep it 2-3 sentences. Be specific to the scene context.
 

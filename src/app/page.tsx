@@ -7,6 +7,9 @@ import NarrativeDisplay from '@/components/ui/NarrativeDisplay';
 import ChoiceSystem from '@/components/ui/ChoiceSystem';
 import GameHUD from '@/components/ui/GameHUD';
 import JumpScare from '@/components/ui/JumpScare';
+import DontMoveQTE from '@/components/ui/DontMoveQTE';
+import ButterflyNotification from '@/components/ui/ButterflyNotification';
+import StatusUpdateToast from '@/components/ui/StatusUpdateToast';
 
 const GameScene = dynamic(() => import('@/components/three/GameScene'), { ssr: false });
 
@@ -61,9 +64,8 @@ export default function GamePage() {
 
       {/* Scene fade-to-black transition */}
       <div
-        className={`absolute inset-0 bg-black z-20 pointer-events-none transition-opacity duration-500 ${
-          isTransitioning ? 'opacity-100' : 'opacity-0'
-        }`}
+        className={`absolute inset-0 bg-black z-20 pointer-events-none transition-opacity duration-500 ${isTransitioning ? 'opacity-100' : 'opacity-0'
+          }`}
       />
 
       <GameHUD />
@@ -100,7 +102,10 @@ export default function GamePage() {
 
       <NarrativeDisplay />
       <ChoiceSystem />
+      <DontMoveQTE />
       <JumpScare />
+      <ButterflyNotification />
+      <StatusUpdateToast />
     </main>
   );
 }
