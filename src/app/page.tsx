@@ -15,7 +15,8 @@ import FearEffects from '@/components/ui/FearEffects';
 import SceneTitleCard from '@/components/ui/SceneTitleCard';
 import { LightningFlashEffect } from '@/components/three/LightningFlash';
 import CharacterDeathEffects from '@/components/ui/CharacterDeathEffects';
-import DeathRecap from '@/components/ui/DeathRecap';
+ import DeathRecap from '@/components/ui/DeathRecap';
+ import SurvivalScreen from '@/components/ui/SurvivalScreen';
 import PauseMenu from '@/components/ui/PauseMenu';
 import { useMusicSync } from '@/lib/musicManager';
 import { NarratorPersonality } from '@/lib/store';
@@ -45,7 +46,7 @@ const PERSONALITY_OPTIONS: Array<{
 ];
 
 export default function GamePage() {
-  const { phase, setPhase, currentScene, setCurrentScene, setCurrentEnvironment, fearLevel, jumpScareActive, voiceEnabled, toggleVoice, narratorPersonality, setNarratorPersonality, isPaused, togglePause, resetGame } =
+  const { phase, setPhase, currentScene, setCurrentScene, setCurrentEnvironment, fearLevel, jumpScareActive, narratorPersonality, setNarratorPersonality, isPaused, togglePause, resetGame } =
     useGameStore();
 
   useMusicSync(fearLevel, jumpScareActive);
@@ -53,14 +54,14 @@ export default function GamePage() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const prevPhaseRef = useRef(phase);
 
-  // Escape key toggles pause (only during active gameplay)
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && phase !== 'intro') togglePause();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [phase, togglePause]);
+   // Escape key toggles pause (only during active gameplay)
+   useEffect(() => {
+     const handler = (e: KeyboardEvent) => {
+       if (e.key === 'Escape' && phase !== 'intro' && phase !== 'ending') togglePause();
+     };
+     window.addEventListener('keydown', handler);
+     return () => window.removeEventListener('keydown', handler);
+   }, [phase, togglePause]);
 
   // Fade-to-black on scene change
   useEffect(() => {
@@ -162,17 +163,7 @@ export default function GamePage() {
             Begin Story
           </button>
 
-          {/* Voice toggle */}
-          <button
-            onClick={toggleVoice}
-            className="relative z-10 w-56 px-8 py-3 text-xs tracking-[0.3em] uppercase transition-all duration-300 mb-6"
-            style={{
-              border: voiceEnabled ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(75,85,99,0.3)',
-              color: voiceEnabled ? 'rgba(252,165,165,0.8)' : 'rgba(107,114,128,0.6)',
-            }}
-          >
-            Voice: {voiceEnabled ? 'On' : 'Off'}
-          </button>
+
 
           {/* Narrator personality selector */}
           <div className="relative z-10 flex gap-2 mb-6">
@@ -216,8 +207,9 @@ export default function GamePage() {
       <StatusUpdateToast />
       <FearEffects />
       <LightningFlashEffect />
-      <CharacterDeathEffects />
-      <DeathRecap />
+       <CharacterDeathEffects />
+       <DeathRecap />
+       <SurvivalScreen />
       {isPaused && <PauseMenu />}
     </main>
   );

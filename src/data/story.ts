@@ -1834,6 +1834,7 @@ export const storyScenes: Record<string, Scene> = {
     id: 'ending_sacrifice',
     title: 'The Dawn',
     description: 'Not everyone makes it...',
+    isEnding: true,
     dialogue: [
       {
         speaker: 'narrator',
@@ -1842,19 +1843,16 @@ export const storyScenes: Record<string, Scene> = {
         mood: 'somber'
       }
     ],
-    choicesAt: 1,
     environment: 'woods',
     cameraPosition: [0, 4, 8],
     aiDriven: true,
-    choices: [
-      { id: 'ending_restart', text: 'Play Again', nextScene: 'prologue_start' },
-    ],
   },
 
   ending_survival: {
     id: 'ending_survival',
     title: 'Together Until Dawn',
     description: 'You survived... together',
+    isEnding: true,
     dialogue: [
       {
         speaker: 'narrator',
@@ -1863,13 +1861,9 @@ export const storyScenes: Record<string, Scene> = {
         mood: 'hopeful'
       }
     ],
-    choicesAt: 1,
     environment: 'woods',
     cameraPosition: [0, 4, 8],
     aiDriven: true,
-    choices: [
-      { id: 'ending_restart', text: 'Play Again', nextScene: 'prologue_start' },
-    ],
   },
 };
 

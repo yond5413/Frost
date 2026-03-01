@@ -38,11 +38,12 @@ export interface Scene {
   }>;
   environment?: 'cabin' | 'woods' | 'mines' | 'lodge';
   activeCharacter?: string;
-  aiDriven?: boolean; // NEW: AI generates outcome for this scene
-  fearReset?: boolean; // NEW: Reset fear level to 0 at the start of this scene
-  // Legacy support while migrating
-  narratorText?: string;
-  speaker?: string;
+   aiDriven?: boolean; // NEW: AI generates outcome for this scene
+   fearReset?: boolean; // NEW: Reset fear level to 0 at the start of this scene
+   isEnding?: boolean; // NEW: Mark this scene as an ending
+   // Legacy support while migrating
+   narratorText?: string;
+   speaker?: string;
 }
 
 export type AnimationType = 'idle' | 'walk' | 'talking' | 'gesture_angry' | 'gesture_happy' | 'gesture_sad' | 'gesture_scared' | 'shock' | 'fear';
@@ -136,11 +137,9 @@ interface GameState {
   addConsequence: (consequence: string) => void;
   clearActiveConsequence: () => void;
   setCurrentEnvironment: (env: EnvironmentType) => void;
-  voiceEnabled: boolean;
   activateWendigo: () => void;
   triggerJumpScare: () => void;
   clearJumpScare: () => void;
-  toggleVoice: () => void;
   setCurrentSpeaker: (speaker: string) => void;
   setCurrentCameraShot: (shot: CameraShot) => void;
 
@@ -241,11 +240,10 @@ const initialState = {
     josh_sam: { value: 65 },
     emily_matt: { value: 65 },
   },
-  activeCharacter: 'sam',
-  wendigoActive: false,
-  jumpScareActive: false,
-  voiceEnabled: false,
-  qteActive: false,
+   activeCharacter: 'sam',
+   wendigoActive: false,
+   jumpScareActive: false,
+   qteActive: false,
   currentSpeaker: 'narrator',
   currentCameraShot: 'wide' as CameraShot,
   conversationHistory: [],
@@ -336,7 +334,6 @@ export const useGameStore = create<GameState>()(persist((set, get) => ({
   activateWendigo: () => set({ wendigoActive: true }),
   triggerJumpScare: () => set({ jumpScareActive: true }),
   clearJumpScare: () => set({ jumpScareActive: false }),
-  toggleVoice: () => set((state) => ({ voiceEnabled: !state.voiceEnabled })),
   setCurrentSpeaker: (speaker) => set({ currentSpeaker: speaker }),
   setCurrentCameraShot: (shot) => set({ currentCameraShot: shot }),
 
@@ -439,16 +436,16 @@ export const useGameStore = create<GameState>()(persist((set, get) => ({
   togglePause: () => set((state) => ({ isPaused: !state.isPaused })),
 }), {
   name: 'frost-game-state',
-  partialize: (state) => ({
-    fearLevel: state.fearLevel,
-    characterStates: state.characterStates,
-    inventory: state.inventory,
-    storyMemory: state.storyMemory,
-    currentScene: state.currentScene,
-    playerChoices: state.playerChoices,
-    butterflyEffects: state.butterflyEffects,
-    relationships: state.relationships,
-    narratorPersonality: state.narratorPersonality,
-    behavioralProfile: state.behavioralProfile,
-  }),
+   partialize: (state) => ({
+     fearLevel: state.fearLevel,
+     characterStates: state.characterStates,
+     inventory: state.inventory,
+     storyMemory: state.storyMemory,
+     currentScene: state.currentScene,
+     playerChoices: state.playerChoices,
+     butterflyEffects: state.butterflyEffects,
+     relationships: state.relationships,
+     narratorPersonality: state.narratorPersonality,
+     behavioralProfile: state.behavioralProfile,
+   }),
 }));

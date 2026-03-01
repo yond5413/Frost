@@ -45,3 +45,6 @@ next-env.d.ts
 # session logs
 frost-session.md
 mid.md
+
+
+opencode.json

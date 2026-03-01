@@ -4,7 +4,7 @@ import { useGameStore } from '@/lib/store';
 import CharacterRoster from './CharacterRoster';
 
 export default function GameHUD() {
-  const { clues, fearLevel, phase, voiceEnabled, toggleVoice, togglePause } = useGameStore();
+  const { clues, fearLevel, phase, togglePause } = useGameStore();
 
   const fearBarColor =
     fearLevel > 70
@@ -27,14 +27,17 @@ export default function GameHUD() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Pause button */}
+          {/* Pause button and hint */}
           {(phase === 'scene' || phase === 'choice' || phase === 'exploration') && (
-            <button
-              onClick={togglePause}
-              className="pointer-events-auto text-xs font-mono px-2 py-1 border border-white/10 text-gray-600 hover:text-gray-400 hover:border-white/20 transition-all"
-            >
-              &#9646;&#9646;
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={togglePause}
+                className="pointer-events-auto text-xs font-mono px-2 py-1 border border-white/10 text-gray-600 hover:text-gray-400 hover:border-white/20 transition-all"
+              >
+                &#9646;&#9646;
+              </button>
+              <span className="pointer-events-none text-[10px] font-mono text-gray-600">Press ESC to pause</span>
+            </div>
           )}
 
           {fearLevel > 0 && (
@@ -55,20 +58,7 @@ export default function GameHUD() {
             </div>
           )}
 
-          {/* Voice toggle */}
-          {(phase === 'scene' || phase === 'choice') && (
-            <button
-              onClick={toggleVoice}
-              className="pointer-events-auto text-xs font-mono px-2 py-1 border transition-all"
-              style={{
-                borderColor: voiceEnabled ? 'rgba(239,68,68,0.8)' : 'rgba(75,85,99,0.6)',
-                color: voiceEnabled ? 'rgba(252,165,165,1)' : 'rgba(107,114,128,1)',
-                backgroundColor: voiceEnabled ? 'rgba(127,29,29,0.4)' : 'rgba(0,0,0,0.4)',
-              }}
-            >
-              VOICE: {voiceEnabled ? 'ON' : 'OFF'}
-            </button>
-          )}
+
         </div>
       </div>
     </div>

@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore, Choice } from '@/lib/store';
 import { getScene } from '@/data/story';
 import { useMistralAI } from '@/lib/mistral';
-import { useElevenLabs, CHARACTER_VOICE_IDS } from '@/hooks/useVoice';
-import { audioQueue } from '@/lib/audioQueue';
+
 import CharacterPortrait from './CharacterPortrait';
 import ConsequencePopup from './ConsequencePopup';
 import { getCharacter } from '@/data/characters';
@@ -24,7 +23,6 @@ export default function NarrativeDisplay() {
     addConsequence, setCurrentEnvironment,
     fearLevel, incrementFear, setFearLevel,
     wendigoActive, activateWendigo, triggerJumpScare,
-    voiceEnabled,
     playerChoices, characterStates, characterTraits, relationships, butterflyEffects,
     activeCharacter, applyAIChanges,
     setCurrentSpeaker, setCurrentCameraShot,
@@ -55,11 +53,11 @@ export default function NarrativeDisplay() {
   // Always-current refs to avoid stale closures in startTypewriter/handleSkip
   const sceneRef = useRef(scene);
   const aiChoicesRef = useRef(aiChoices);
+
   sceneRef.current = scene;
   aiChoicesRef.current = aiChoices;
 
   const { generateStory } = useMistralAI();
-  const { stop } = useElevenLabs();
 
   // Keep totalLinesRef in sync
   useEffect(() => {
@@ -92,6 +90,10 @@ export default function NarrativeDisplay() {
     const checkEnd = (idx: number) => {
       const totalLines = totalLinesRef.current;
       if (idx + 1 >= totalLines) {
+        if (sceneRef.current?.isEnding) {
+          setPhase('ending');
+          return;
+        }
         if (aiChosenRouteRef.current) {
           navigateToChosenRoute();
         } else if (aiChoicesRef.current.length > 0 || (sceneRef.current.choices && sceneRef.current.choices.length > 0)) {
@@ -133,8 +135,8 @@ export default function NarrativeDisplay() {
         setIsTyping(false);
         checkEnd(lineIndex);
       }
-    }, 30);
-  }, [scene, setPhase, aiChoices.length, navigateToChosenRoute]);
+    }, 45); // Increased from 30ms to 45ms to better match speech pacing
+   }, [setPhase, setCurrentScene, navigateToChosenRoute]);
 
   useEffect(() => {
     return () => {
@@ -171,8 +173,6 @@ export default function NarrativeDisplay() {
   // Handle AI-driven scenes with full context
   useEffect(() => {
     if (advanceTimerRef.current) { clearTimeout(advanceTimerRef.current); advanceTimerRef.current = null; }
-    stop();
-    audioQueue.flush();
     setCurrentLineIndex(0);
     setDisplayText('');
     setShowChoices(false);
@@ -329,29 +329,9 @@ export default function NarrativeDisplay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScene, scene.aiDriven]);
 
-  // Wire audioQueue callbacks for speaking indicator
-  const [isSpeakingLine, setIsSpeakingLine] = useState(false);
-  useEffect(() => {
-    audioQueue.onLineStart = () => setIsSpeakingLine(true);
-    audioQueue.onLineEnd = () => setIsSpeakingLine(false);
-    return () => {
-      audioQueue.onLineStart = undefined;
-      audioQueue.onLineEnd = undefined;
-    };
-  }, []);
 
-  // Voice narration fires when a line finishes typing
-  useEffect(() => {
-    if (!isTyping && displayText && voiceEnabled && !showChoices) {
-      const activeDlg = aiDialogueLines.length > 0 ? aiDialogueLines : scene.dialogue;
-      const dialogueLine = activeDlg[currentLineIndex];
-      if (dialogueLine) {
-        const voiceId = CHARACTER_VOICE_IDS[dialogueLine.speaker] || CHARACTER_VOICE_IDS.narrator;
-        audioQueue.enqueue(displayText, voiceId, fearLevel);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTyping, displayText, voiceEnabled, showChoices, currentLineIndex]);
+
+
 
   const handleSkip = useCallback(() => {
     if (isTyping && pendingTextRef.current) {
@@ -361,6 +341,10 @@ export default function NarrativeDisplay() {
       setIsTyping(false);
       const totalLines = totalLinesRef.current;
       if (currentLineIndex + 1 >= totalLines) {
+        if (sceneRef.current?.isEnding) {
+          setPhase('ending');
+          return;
+        }
         if (aiChosenRouteRef.current) {
           navigateToChosenRoute();
         } else if (aiChoicesRef.current.length > 0 || (sceneRef.current.choices && sceneRef.current.choices.length > 0)) {
@@ -466,57 +450,51 @@ export default function NarrativeDisplay() {
           onClick={isTyping ? handleSkip : (!showChoices && currentLineIndex + 1 < (aiDialogueLines.length > 0 ? aiDialogueLines.length : scene.dialogue.length) ? handleAdvance : undefined)}
           style={{ cursor: (isTyping || (!showChoices && currentLineIndex + 1 < (aiDialogueLines.length > 0 ? aiDialogueLines.length : scene.dialogue.length))) ? 'pointer' : 'default' }}
         >
-          {/* Zone 1: text content */}
-          <div className={`flex flex-1 min-h-0 transition-opacity duration-300 ${lineVisible ? 'opacity-100' : 'opacity-0'}`}>
-            {isNarrator ? (
-              /* Narrator: centered italic text */
-              <div className="flex items-center justify-center w-full px-8">
-                {isGeneratingAI ? (
-                  <p className="text-gray-500 text-lg italic font-serif animate-pulse text-center">
-                    {loadingLine}
-                  </p>
-                ) : (
-                  <p className="text-gray-400/90 text-lg italic font-serif text-center max-w-3xl leading-relaxed">
-                    {displayText}
-                    {isTyping && <span className="animate-pulse">|</span>}
-                  </p>
-                )}
-              </div>
-            ) : (
-              /* Character dialogue: portrait + text column */
-              <div className="flex flex-row items-start gap-4 px-6 py-4 w-full">
-                {currentDialogueLine && (
-                  <CharacterPortrait speakerId={currentDialogueLine.speaker} mood={currentDialogueLine.mood} />
-                )}
-                <div className="flex flex-col justify-center flex-1">
-                  {currentDialogueLine && (
-                    <span
-                      className="text-[10px] uppercase tracking-[0.3em] font-bold mb-1 flex items-center gap-1.5"
-                      style={{ color: getCharacter(currentDialogueLine.speaker).color }}
-                    >
-                      {getCharacter(currentDialogueLine.speaker).name}
-                      {isSpeakingLine && voiceEnabled && (
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-                      )}
-                    </span>
-                  )}
-                  {isGeneratingAI ? (
-                    <p className="text-gray-500 text-xl italic font-serif animate-pulse">
-                      {loadingLine}
-                    </p>
-                  ) : (
-                    <p
-                      className="text-white/95 text-xl font-serif leading-relaxed"
-                      style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}
-                    >
-                      {displayText}
-                      {isTyping && <span className="animate-pulse">|</span>}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+           {/* Zone 1: text content */}
+           <div className={`flex flex-1 min-h-0 transition-opacity duration-300 ${lineVisible ? 'opacity-100' : 'opacity-0'}`}>
+             {isGeneratingAI ? (
+               <div className="flex items-center justify-center w-full px-8 gap-3">
+                 <div className="flex gap-1">
+                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-700/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-700/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-700/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                 </div>
+                 <p className="text-gray-500 text-sm italic font-serif animate-pulse">{loadingLine}</p>
+               </div>
+             ) : isNarrator ? (
+               /* Narrator: centered italic text */
+               <div className="flex items-center justify-center w-full px-8">
+                 <p className="text-gray-400/90 text-lg italic font-serif text-center max-w-3xl leading-relaxed">
+                   {displayText}
+                   {isTyping && <span className="animate-pulse">|</span>}
+                 </p>
+               </div>
+             ) : (
+               /* Character dialogue: portrait + text column */
+               <div className="flex flex-row items-start gap-4 px-6 py-4 w-full">
+                 {currentDialogueLine && (
+                   <CharacterPortrait speakerId={currentDialogueLine.speaker} mood={currentDialogueLine.mood} />
+                 )}
+                 <div className="flex flex-col justify-center flex-1">
+                   {currentDialogueLine && (
+                     <span
+                       className="text-[10px] uppercase tracking-[0.3em] font-bold mb-1 flex items-center gap-1.5"
+                       style={{ color: getCharacter(currentDialogueLine.speaker).color }}
+                     >
+                       {getCharacter(currentDialogueLine.speaker).name}
+                     </span>
+                   )}
+                   <p
+                     className="text-white/95 text-xl font-serif leading-relaxed"
+                     style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}
+                   >
+                     {displayText}
+                     {isTyping && <span className="animate-pulse">|</span>}
+                   </p>
+                 </div>
+               </div>
+             )}
+           </div>
 
           {/* Zone 2: choices — only shown in non-director mode */}
           {showChoices && !isDirectorMode && choicesToShow.length > 0 && (
