@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useGameStore } from '@/lib/store';
 
 const AI_OBSERVATIONS = [
@@ -20,18 +20,6 @@ function getObservation(index: number): string {
 export default function ButterflyEffectTracker() {
   const storyMemory = useGameStore((state) => state.storyMemory);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isPulsing, setIsPulsing] = useState(false);
-  const prevLengthRef = useRef(storyMemory.length);
-
-  // Pulse when a new entry arrives
-  useEffect(() => {
-    if (storyMemory.length > prevLengthRef.current) {
-      prevLengthRef.current = storyMemory.length;
-      setIsPulsing(true);
-      const t = setTimeout(() => setIsPulsing(false), 2000);
-      return () => clearTimeout(t);
-    }
-  }, [storyMemory.length]);
 
   if (storyMemory.length === 0) return null;
 
@@ -75,13 +63,13 @@ export default function ButterflyEffectTracker() {
         {/* Butterfly icon */}
         <svg
           viewBox="0 0 100 100"
-          className={`w-3.5 h-3.5 fill-current transition-colors duration-500 ${isPulsing ? 'text-cyan-400 animate-pulse' : 'text-gray-600'}`}
+          className="w-3.5 h-3.5 fill-current text-gray-600"
         >
           <path d="M50 50 C20 20 10 50 10 70 C10 90 30 90 50 70 C70 90 90 90 90 70 C90 50 80 20 50 50 Z" />
         </svg>
 
         {/* Count badge */}
-        <span className={`text-[8px] tabular-nums transition-colors duration-500 ${isPulsing ? 'text-cyan-400' : 'text-gray-600'}`}>
+        <span className="text-[8px] tabular-nums text-gray-600">
           {storyMemory.length}
         </span>
 

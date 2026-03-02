@@ -1,7 +1,5 @@
 'use client';
 
-import { useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
 import { EffectComposer, Vignette, Noise, ChromaticAberration, Bloom, ToneMapping } from '@react-three/postprocessing';
 import { BlendFunction, ToneMappingMode } from 'postprocessing';
 import { Vector2 } from 'three';
@@ -17,16 +15,11 @@ export default function PostProcessing() {
 
   const noiseOpacity = fearLevel > 30 ? Math.min(0.12, fearLevel / 300) : 0;
 
-  const chromaticOffset = useRef(new Vector2(0, 0));
-  useFrame(() => {
-    if (jumpScareActive) {
-      chromaticOffset.current.set(0.008, 0.008);
-    } else if (fearLevel > 70) {
-      chromaticOffset.current.set(0.001, 0.001);
-    } else {
-      chromaticOffset.current.set(0, 0);
-    }
-  });
+  const chromaticOffset = jumpScareActive
+    ? new Vector2(0.008, 0.008)
+    : fearLevel > 70
+      ? new Vector2(0.001, 0.001)
+      : new Vector2(0, 0);
 
   const bloomIntensity = jumpScareActive ? 3.0 : 0.3;
 
@@ -42,7 +35,7 @@ export default function PostProcessing() {
         blendFunction={BlendFunction.SCREEN}
       />
       <ChromaticAberration
-        offset={chromaticOffset.current}
+        offset={chromaticOffset}
         blendFunction={BlendFunction.NORMAL}
       />
       <Bloom
