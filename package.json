@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:story-graph": "node scripts/check-story-graph.mjs"
   },
   "dependencies": {
     "@mistralai/mistralai": "^1.14.1",

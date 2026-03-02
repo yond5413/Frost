@@ -60,6 +60,42 @@ function getDirectorFallback(
   };
 }
 
+
+interface DirectorModeResponse {
+  chosenRoute: string;
+  narratorText: string;
+  consequence: string;
+  fearDelta: number;
+  characterDeath: string | null;
+  relationshipChanges: Array<{ character1: string; character2: string; delta: number }>;
+  butterflyEffect: { id: string; choice: string } | null;
+  behavioralDeltas?: { recklessness?: number; loyalty?: number; deception?: number; survivalFocus?: number };
+}
+
+interface NarratorModeResponse {
+  narratorText: string;
+  dialogueLines?: Array<{ speaker: string; text: string; mood?: string; cameraShot?: string }>;
+  choices?: Array<{ id: string; text: string; nextScene: string; fearDelta?: number; consequence?: string; triggerQTE?: boolean }>;
+  relationshipChanges?: Array<{ character1: string; character2: string; delta: number }>;
+  butterflyEffect?: { id: string; choice: string } | null;
+  characterDeath?: string | null;
+  fearDelta?: number;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isDirectorModeResponse(value: unknown): value is DirectorModeResponse {
+  if (!isObject(value)) return false;
+  return typeof value.chosenRoute === 'string' && typeof value.narratorText === 'string' && typeof value.consequence === 'string';
+}
+
+function isNarratorModeResponse(value: unknown): value is NarratorModeResponse {
+  if (!isObject(value)) return false;
+  return typeof value.narratorText === 'string';
+}
+
 const PERSONALITY_CONFIG = {
   balanced: { temperature: 0.85, deathThreshold: 60, deathChance: 0.25, label: 'The Auteur', persona: 'You decide outcomes with care. Every consequence earns its weight.' },
   brutal: { temperature: 0.95, deathThreshold: 40, deathChance: 0.60, label: 'The Reaper', persona: 'You are merciless. Survival is earned, not given. Choose the hardest path when darkness is justified.' },
@@ -290,7 +326,36 @@ Respond ONLY in this exact JSON format:
     }
 
     const data = await response.json();
-    const content = JSON.parse(data.choices[0].message.content);
+    const rawContent = data?.choices?.[0]?.message?.content;
+
+    if (typeof rawContent !== 'string') {
+      console.error('Mistral API returned invalid content payload');
+      if (isDirectorMode) return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
+      return NextResponse.json(getFallback(fearLevel ?? 0));
+    }
+
+    let content: unknown;
+    try {
+      content = JSON.parse(rawContent);
+    } catch (parseErr) {
+      console.error('Failed to parse Mistral JSON response:', parseErr);
+      if (isDirectorMode) return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
+      return NextResponse.json(getFallback(fearLevel ?? 0));
+    }
+
+    if (isDirectorMode) {
+      if (!isDirectorModeResponse(content)) {
+        console.error('Invalid director response shape from Mistral');
+        return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
+      }
+      return NextResponse.json(content);
+    }
+
+    if (!isNarratorModeResponse(content)) {
+      console.error('Invalid narrator response shape from Mistral');
+      return NextResponse.json(getFallback(fearLevel ?? 0));
+    }
+
     return NextResponse.json(content);
   } catch (err) {
     console.error('Story generation failed:', err);

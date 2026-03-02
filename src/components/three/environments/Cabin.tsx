@@ -15,7 +15,7 @@ function ChimneySmoke() {
   const smokeRef = useRef<THREE.Points>(null);
   const timeRef = useRef(0);
   
-  const { positions, velocities, lifetimes } = useMemo(() => {
+  const { positions, velocities } = useMemo(() => {
     const count = 30;
     const pos = new Float32Array(count * 3);
     const vel = new Float32Array(count * 3);
@@ -29,9 +29,11 @@ function ChimneySmoke() {
       vel[i * 3 + 2] = (seededRandom(i + 500) - 0.5) * 0.2;
       life[i] = seededRandom(i + 600);
     }
-    return { positions: pos, velocities: vel, lifetimes: life };
+    return { positions: pos, velocities: vel };
   }, []);
-  
+
+  const lifetimesRef = useRef<Float32Array>(Float32Array.from({ length: 30 }, (_, i) => seededRandom(i + 600)));
+
   useFrame((_, delta) => {
     if (!smokeRef.current) return;
     timeRef.current += delta;
@@ -43,13 +45,13 @@ function ChimneySmoke() {
       pos[i * 3 + 1] += velocities[i * 3 + 1] * delta;
       pos[i * 3 + 2] += velocities[i * 3 + 2] * delta;
       
-      lifetimes[i] += delta * 0.3;
-      
-      if (lifetimes[i] > 1) {
+      lifetimesRef.current[i] += delta * 0.3;
+
+      if (lifetimesRef.current[i] > 1) {
         pos[i * 3] = (seededRandom(i + Math.floor(currentTime * 10)) - 0.5) * 0.3;
         pos[i * 3 + 1] = 0;
         pos[i * 3 + 2] = (seededRandom(i + Math.floor(currentTime * 10) + 200) - 0.5) * 0.3;
-        lifetimes[i] = 0;
+        lifetimesRef.current[i] = 0;
       }
     }
     smokeRef.current.geometry.attributes.position.needsUpdate = true;
