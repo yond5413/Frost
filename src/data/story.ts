@@ -1076,7 +1076,7 @@ export const storyScenes: Record<string, Scene> = {
     activeCharacter: 'mike',
     choices: [
       { id: 'ch2_to_shed', text: 'Follow Mike to the shed', nextScene: 'ch2_find_mike', fearDelta: 15 },
-      { id: 'ch2_search_alone', text: 'Search for Jessica alone', nextScene: 'ch2_find_mike', fearDelta: 35, consequence: 'You went back into the dark alone. A decision you may regret.' },
+      { id: 'ch2_search_alone', text: 'Search for Jessica alone', nextScene: 'ch2_find_mike', fearDelta: 35, consequence: 'butterfly_lone_wolf' },
     ],
   },
 
@@ -1460,7 +1460,7 @@ export const storyScenes: Record<string, Scene> = {
     choicesAt: 1,
     environment: 'lodge',
     choices: [
-      { id: 'ch3_read_clipping', text: 'Read the article', nextScene: 'chapter4_start', consequence: 'learned_history' },
+      { id: 'ch3_read_clipping', text: 'Read the article', nextScene: 'chapter4_start', consequence: 'butterfly_learned_history' },
       { id: 'ch3_ignore', text: 'Ignore and continue', nextScene: 'chapter4_start' },
     ],
   },
@@ -1825,8 +1825,112 @@ export const storyScenes: Record<string, Scene> = {
     cameraPosition: [-3, 2, 5],
     activeCharacter: 'sam',
     choices: [
-      { id: 'ch5_reach_cable', text: 'Reach the cable car', nextScene: 'ending_survival', fearDelta: 25 },
+      { id: 'ch5_reach_cable', text: 'Reach the cable car', nextScene: 'ch5_bridge_run', fearDelta: 25 },
       { id: 'ch5_last_stand', text: 'Make a final stand', nextScene: 'ending_sacrifice', fearDelta: 40 },
+      { id: 'ch5_tunnel_escape', text: 'Break for the service tunnel', nextScene: 'ch5_tunnel_escape', fearDelta: 20 },
+    ],
+  },
+
+
+
+  ch5_bridge_run: {
+    id: 'ch5_bridge_run',
+    title: 'The Broken Span',
+    description: 'A final sprint above the ravine',
+    dialogue: [
+      {
+        speaker: 'narrator',
+        text: 'The suspension bridge groans beneath your weight, cables snapping one by one as the pack crashes into the snow behind you.',
+        camera: 'tracking',
+        mood: 'scared'
+      },
+      {
+        speaker: 'sam',
+        text: 'Don\'t stop! Keep moving! If this thing goes, we all go with it!',
+        mood: 'scared',
+        animation: 'talking',
+        camera: 'closeup'
+      },
+      {
+        speaker: 'mike',
+        text: 'I\'ll hold the back line. Get Ashley and Chris across now!',
+        mood: 'determined',
+        animation: 'gesture_angry',
+        camera: 'over_shoulder'
+      }
+    ],
+    choicesAt: 1,
+    environment: 'woods',
+    cameraPosition: [1, 2, 6],
+    activeCharacter: 'sam',
+    choices: [
+      { id: 'ch5_bridge_cut', text: 'Cut the final cable to slow them', nextScene: 'ending_survival', fearDelta: 10 },
+      { id: 'ch5_bridge_help_mike', text: 'Turn back to help Mike', nextScene: 'ending_sacrifice', fearDelta: 30 },
+    ],
+  },
+
+  ch5_tunnel_escape: {
+    id: 'ch5_tunnel_escape',
+    title: 'Service Tunnel',
+    description: 'Claustrophobic escape route',
+    dialogue: [
+      {
+        speaker: 'narrator',
+        text: 'You dive into a rusted maintenance tunnel. Your breath turns to fog in the cramped dark as claws scrape overhead.',
+        camera: 'pov',
+        mood: 'scared'
+      },
+      {
+        speaker: 'ashley',
+        text: 'I hear them in the walls. They\'re pacing us. They know where we\'re going.',
+        mood: 'scared',
+        animation: 'gesture_scared',
+        camera: 'closeup'
+      },
+      {
+        speaker: 'stranger',
+        text: 'There\'s a signal tower exit ahead. Reach it and fire the flare. That\'s your only chance.',
+        mood: 'serious',
+        animation: 'talking',
+        camera: 'medium'
+      }
+    ],
+    choicesAt: 1,
+    environment: 'mines',
+    cameraPosition: [-1, 1.8, 4],
+    activeCharacter: 'sam',
+    choices: [
+      { id: 'ch5_tunnel_sprint', text: 'Sprint for the tower hatch', nextScene: 'ch5_signal_tower', fearDelta: 20 },
+      { id: 'ch5_tunnel_hide', text: 'Hide and let the creatures pass', nextScene: 'ending_sacrifice', fearDelta: 35 },
+    ],
+  },
+
+  ch5_signal_tower: {
+    id: 'ch5_signal_tower',
+    title: 'Last Flare',
+    description: 'Call for rescue before dawn',
+    dialogue: [
+      {
+        speaker: 'narrator',
+        text: 'You burst out beside the old ranger tower. Wind howls through broken glass as the horizon lightens by a shade.',
+        camera: 'wide',
+        mood: 'somber'
+      },
+      {
+        speaker: 'sam',
+        text: 'Flare gun\'s loaded. One shot. If this misses, we don\'t get another.',
+        mood: 'determined',
+        animation: 'talking',
+        camera: 'closeup'
+      }
+    ],
+    choicesAt: 1,
+    environment: 'woods',
+    cameraPosition: [0, 2.5, 7],
+    activeCharacter: 'sam',
+    choices: [
+      { id: 'ch5_tower_fire', text: 'Fire the flare into the sky', nextScene: 'ending_survival', fearDelta: 5 },
+      { id: 'ch5_tower_hold', text: 'Hold fire and stay hidden', nextScene: 'ending_sacrifice', fearDelta: 25 },
     ],
   },
 
@@ -1845,7 +1949,7 @@ export const storyScenes: Record<string, Scene> = {
     ],
     environment: 'woods',
     cameraPosition: [0, 4, 8],
-    aiDriven: true,
+    aiDriven: false,
   },
 
   ending_survival: {
@@ -1863,7 +1967,7 @@ export const storyScenes: Record<string, Scene> = {
     ],
     environment: 'woods',
     cameraPosition: [0, 4, 8],
-    aiDriven: true,
+    aiDriven: false,
   },
 };
 

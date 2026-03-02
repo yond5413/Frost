@@ -56,8 +56,10 @@ function ShadowWendigo({ chapter, intensity }: { chapter: number; intensity: num
     <group ref={groupRef}>
       <mesh ref={bodyRef}>
         <capsuleGeometry args={[0.4, 2.2, 8, 16]} />
-        <meshBasicMaterial 
-          color="#000000" 
+        <meshStandardMaterial 
+          color="#080808" 
+          roughness={0.92}
+          metalness={0.05}
           transparent 
           opacity={bodyOpacity * intensity}
         />
@@ -65,13 +67,34 @@ function ShadowWendigo({ chapter, intensity }: { chapter: number; intensity: num
       
       <mesh position={[0, 2.4, 0]}>
         <sphereGeometry args={[0.35, 16, 16]} />
-        <meshBasicMaterial 
-          color="#000000" 
+        <meshStandardMaterial 
+          color="#080808" 
+          roughness={0.92}
+          metalness={0.05}
           transparent 
           opacity={bodyOpacity * intensity}
         />
       </mesh>
       
+
+      <mesh position={[0, 2.22, 0.32]} rotation={[0.28, 0, 0]}>
+        <coneGeometry args={[0.18, 0.35, 6]} />
+        <meshStandardMaterial color="#121212" roughness={0.95} metalness={0.02} transparent opacity={bodyOpacity * intensity} />
+      </mesh>
+
+      {chapter >= 3 && (
+        <>
+          <mesh position={[-0.22, 1.05, 0.18]} rotation={[0.1, 0, 0.55]}>
+            <capsuleGeometry args={[0.045, 0.55, 4, 8]} />
+            <meshStandardMaterial color="#0b0b0b" roughness={0.9} metalness={0.05} transparent opacity={0.45 * intensity} />
+          </mesh>
+          <mesh position={[0.22, 1.05, 0.18]} rotation={[0.1, 0, -0.55]}>
+            <capsuleGeometry args={[0.045, 0.55, 4, 8]} />
+            <meshStandardMaterial color="#0b0b0b" roughness={0.9} metalness={0.05} transparent opacity={0.45 * intensity} />
+          </mesh>
+        </>
+      )}
+
       {antlerVisibility > 0 && (
         <>
           <mesh position={[-0.2, 2.9, -0.1]} rotation={[0, 0, -0.4]} scale={antlerVisibility}>

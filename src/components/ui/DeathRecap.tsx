@@ -3,7 +3,7 @@
 import { useGameStore } from '@/lib/store';
 
 export default function DeathRecap() {
-  const { phase, consequences, fearLevel, storyMemory, resetGame } = useGameStore();
+  const { phase, consequences, fearLevel, storyMemory, resetGame, runtimeTelemetry } = useGameStore();
 
   const deaths = consequences.filter((c) => c.startsWith('death_')).map((c) => c.replace('death_', ''));
 
@@ -34,6 +34,17 @@ export default function DeathRecap() {
             className="h-px bg-gradient-to-r from-gray-600 to-red-600 transition-all duration-1000"
             style={{ width: `${fearLevel}%` }}
           />
+        </div>
+      </div>
+
+
+      <div className="w-full max-w-lg mb-6">
+        <p className="text-[10px] uppercase tracking-[0.4em] text-gray-700 mb-3">Director Summary</p>
+        <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+          <div className="border border-white/10 px-2 py-1 text-gray-400">AI decisions: <span className="text-gray-200">{runtimeTelemetry.aiDecisions}</span></div>
+          <div className="border border-white/10 px-2 py-1 text-gray-400">Deterministic: <span className="text-gray-200">{runtimeTelemetry.deterministicTransitions}</span></div>
+          <div className="border border-white/10 px-2 py-1 text-gray-400">Fallbacks: <span className="text-gray-200">{runtimeTelemetry.aiFallbacks}</span></div>
+          <div className="border border-white/10 px-2 py-1 text-gray-400">Timeouts: <span className="text-gray-200">{runtimeTelemetry.aiTimeouts}</span></div>
         </div>
       </div>
 

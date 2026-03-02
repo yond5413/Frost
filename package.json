@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:story-graph": "node scripts/check-story-graph.mjs"
+    "check:story-graph": "node scripts/check-story-graph.mjs",
+    "check:progression-smoke": "node scripts/check-progression-smoke.mjs"
   },
   "dependencies": {
     "@mistralai/mistralai": "^1.14.1",
