@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 interface VoiceRequest {
   text: string;
   speaker?: string;
+  variant?: number;
 }
 
 const DEFAULT_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
@@ -21,6 +22,16 @@ const SPEAKER_VOICE_MAP: Record<string, string | undefined> = {
   hunter: process.env.ELEVENLABS_VOICE_ID_STRANGER,
 };
 
+
+function parseVoiceVariants(value: string | undefined, fallback: string): string[] {
+  const values = (value || fallback)
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  return values.length > 0 ? values : [fallback];
+}
+
 function sanitizeText(input: string): string {
   return input.replace(/\s+/g, ' ').trim().slice(0, 500);
 }
@@ -38,7 +49,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Text is required.' }, { status: 400 });
     }
 
-    const voiceId = SPEAKER_VOICE_MAP[body.speaker || ''] || DEFAULT_VOICE_ID;
+    const speakerVoice = SPEAKER_VOICE_MAP[body.speaker || ''] || DEFAULT_VOICE_ID;
+    const speakerVariants = speakerVoice.includes(',') ? speakerVoice : '';
+    const voiceVariants = parseVoiceVariants(speakerVariants || process.env.ELEVENLABS_VOICE_VARIANTS, speakerVoice);
+    const variantIndex = Math.max(0, Number(body.variant || 0)) % voiceVariants.length;
+    const voiceId = voiceVariants[variantIndex] || speakerVoice;
     const upstream = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, {
       method: 'POST',
       headers: {

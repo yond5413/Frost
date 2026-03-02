@@ -77,6 +77,7 @@ export function useVoice() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlCacheRef = useRef<Map<string, string>>(new Map());
   const cancelTokenRef = useRef(0);
+  const speakerVariantRef = useRef<Record<string, number>>({});
 
   const refreshVoices = useCallback((): void => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -148,7 +149,7 @@ export function useVoice() {
     flushSpeechSynthesisQueue();
   }, [flushSpeechSynthesisQueue, pickVoice]);
 
-  const playViaElevenLabs = useCallback(async (text: string, speakerId: string, token: number): Promise<boolean> => {
+  const playViaElevenLabs = useCallback(async (text: string, speakerId: string, token: number, variant: number): Promise<boolean> => {
     const cacheKey = `${speakerId}:${text}`;
 
     try {
@@ -157,7 +158,7 @@ export function useVoice() {
         const response = await fetch('/api/voice', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, speaker: speakerId }),
+          body: JSON.stringify({ text, speaker: speakerId, variant }),
         });
 
         if (!response.ok) return false;
@@ -186,8 +187,10 @@ export function useVoice() {
     refreshVoices();
     cancel();
     const token = cancelTokenRef.current;
+    const nextVariant = (speakerVariantRef.current[speakerId] || 0) + 1;
+    speakerVariantRef.current[speakerId] = nextVariant;
 
-    const playedCloudVoice = await playViaElevenLabs(trimmed, speakerId, token);
+    const playedCloudVoice = await playViaElevenLabs(trimmed, speakerId, token, nextVariant);
     if (!playedCloudVoice && token === cancelTokenRef.current) {
       playViaSpeechSynthesis(trimmed, speakerId);
     }

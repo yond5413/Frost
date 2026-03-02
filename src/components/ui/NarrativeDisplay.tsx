@@ -105,6 +105,7 @@ export default function NarrativeDisplay() {
   // Always-current refs to avoid stale closures in startTypewriter/handleSkip
   const sceneRef = useRef(scene);
   const aiChoicesRef = useRef(aiChoices);
+  const lastSpokenLineKeyRef = useRef<string>('');
 
   sceneRef.current = scene;
   aiChoicesRef.current = aiChoices;
@@ -614,11 +615,13 @@ export default function NarrativeDisplay() {
 
   useEffect(() => {
     if (!voiceEnabled) {
+      lastSpokenLineKeyRef.current = '';
       cancel();
       return;
     }
 
     if (phase !== 'scene' && phase !== 'choice') {
+      lastSpokenLineKeyRef.current = '';
       cancel();
       return;
     }
@@ -626,8 +629,12 @@ export default function NarrativeDisplay() {
     if (!currentDialogueLine) return;
     if (currentDialogueLine.speaker === 'narrator') return;
 
-    speak(currentDialogueLine.text || '', currentDialogueLine.speaker);
-  }, [voiceEnabled, currentDialogueLine, phase, speak, cancel]);
+    const lineKey = `${currentScene}:${currentLineIndex}:${currentDialogueLine.speaker}:${currentDialogueLine.text}`;
+    if (lineKey === lastSpokenLineKeyRef.current) return;
+
+    lastSpokenLineKeyRef.current = lineKey;
+    void speak(currentDialogueLine.text || '', currentDialogueLine.speaker);
+  }, [voiceEnabled, currentDialogueLine, currentLineIndex, currentScene, phase, speak, cancel]);
 
   if (phase !== 'scene' && phase !== 'choice') return null;
   if (!currentDialogueLine && !isGeneratingAI) return null;
