@@ -1,20 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
-import * as THREE from 'three';
+
 
 export default function MinesEnvironment() {
-  const tunnelCurve = useMemo(() => {
-    const points = [
-      new THREE.Vector3(0, 1.5, 0),
-      new THREE.Vector3(0, 1.5, -8),
-      new THREE.Vector3(3, 1.8, -15),
-      new THREE.Vector3(5, 1.2, -22),
-      new THREE.Vector3(3, 1.5, -30),
-    ];
-    return new THREE.CatmullRomCurve3(points);
-  }, []);
-
   return (
     <group>
       <mesh position={[0, 0, -15]} receiveShadow>

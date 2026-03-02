@@ -8,7 +8,14 @@ import { useGameStore } from '@/lib/store';
 import EnvironmentManager from './EnvironmentManager';
 import CharacterGroup from './CharacterGroup';
 import Wendigo from './Wendigo';
+import KeyboardCameraControls from './KeyboardCameraControls';
+import InteractableObject from './InteractableObject';
+import PlayerController from './PlayerController';
+import CinematicCamera from './CinematicCamera';
 import { getScene } from '@/data/story';
+import { JumpScareCameraEffect } from '@/components/ui/JumpScare';
+import LightningFlash from './LightningFlash';
+import PostProcessing from './PostProcessing';
 
 interface CameraControllerProps {
   target: [number, number, number];
@@ -36,9 +43,20 @@ interface SceneProps {
 }
 
 export default function GameScene({ cameraPosition = [0, 3, 10] }: SceneProps) {
-  const { currentScene, wendigoActive } = useGameStore();
+  const { currentScene, wendigoActive, setCurrentScene, setPhase, phase } = useGameStore();
   const sceneData = getScene(currentScene);
   const sceneCameraPosition = sceneData.cameraPosition || cameraPosition;
+
+  const handleInteract = (def: { targetScene: string }) => {
+    const target = getScene(def.targetScene);
+    if (target && target.dialogue && target.dialogue.length > 0) {
+      setCurrentScene(def.targetScene);
+      setPhase('scene');
+    } else {
+      setCurrentScene(def.targetScene);
+      setPhase('exploration');
+    }
+  };
 
   return (
     <Canvas
@@ -47,7 +65,12 @@ export default function GameScene({ cameraPosition = [0, 3, 10] }: SceneProps) {
       className="w-full h-full"
     >
       <Suspense fallback={null}>
+        <PlayerController />
         <CameraController target={sceneCameraPosition} disabled={wendigoActive} />
+        <KeyboardCameraControls />
+        {(phase === 'scene' || phase === 'choice') && <CinematicCamera />}
+        <JumpScareCameraEffect />
+        <LightningFlash />
         <EnvironmentManager />
         <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
         <CharacterGroup />
@@ -64,6 +87,15 @@ export default function GameScene({ cameraPosition = [0, 3, 10] }: SceneProps) {
             rollFrequency={0.4}
           />
         )}
+        {phase === 'exploration' && sceneData.interactables && sceneData.interactables.map((def) => (
+          <InteractableObject
+            key={def.id}
+            position={def.position}
+            label={def.label}
+            onInteract={() => handleInteract(def)}
+          />
+        ))}
+        <PostProcessing />
       </Suspense>
     </Canvas>
   );

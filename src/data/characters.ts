@@ -15,6 +15,8 @@ export const characters: Record<string, Character> = {
   josh:    { id: 'josh',    name: 'Josh',    color: '#94a3b8', borderColor: '#64748b', spawnPosition: [3, 0, 0] },
   emily:   { id: 'emily',   name: 'Emily',   color: '#f472b6', borderColor: '#ec4899', spawnPosition: [0, 0, -2] },
   matt:    { id: 'matt',    name: 'Matt',    color: '#fb923c', borderColor: '#f97316', spawnPosition: [-3, 0, -2] },
+  hannah:  { id: 'hannah',  name: 'Hannah',  color: '#38bdf8', borderColor: '#0ea5e9', spawnPosition: [0, 0, 0] },
+  beth:    { id: 'beth',    name: 'Beth',    color: '#818cf8', borderColor: '#6366f1', spawnPosition: [0, 0, 0] },
   narrator: { id: 'narrator', name: 'Narrator', color: '#9ca3af', borderColor: '#6b7280', spawnPosition: [0, 0, 0] },
 };
 

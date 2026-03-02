@@ -1,7 +1,15 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { EnvironmentType } from './environmentStore';
 
 export type GamePhase = 'intro' | 'exploration' | 'dialogue' | 'choice' | 'scene' | 'ending';
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  type: 'key' | 'note' | 'tool';
+  description: string;
+}
 
 export interface Choice {
   id: string;
@@ -16,20 +24,67 @@ export interface Scene {
   id: string;
   title: string;
   description: string;
-  narratorText?: string;
-  speaker?: string;
-  choices?: Choice[];
+  dialogue: DialogueLine[];
+  choices?: Choice[];  // Legacy/fallback, or can be used with choicesAt
+  choicesAt?: number;  // Index in dialogue array where choices appear
   cameraPosition?: [number, number, number];
+  cameraTarget?: [number, number, number]; // Point camera looks at
+  cameraControls?: boolean; // Allow user to override camera with arrow keys
+  interactables?: Array<{
+    id: string;
+    position: [number, number, number];
+    label: string;
+    targetScene: string;
+  }>;
   environment?: 'cabin' | 'woods' | 'mines' | 'lodge';
   activeCharacter?: string;
+   aiDriven?: boolean; // NEW: AI generates outcome for this scene
+   fearReset?: boolean; // NEW: Reset fear level to 0 at the start of this scene
+   isEnding?: boolean; // NEW: Mark this scene as an ending
+   // Legacy support while migrating
+   narratorText?: string;
+   speaker?: string;
 }
 
-export type AnimationType = 'idle' | 'walk';
+export type AnimationType = 'idle' | 'walk' | 'talking' | 'gesture_angry' | 'gesture_happy' | 'gesture_sad' | 'gesture_scared' | 'shock' | 'fear';
+
+export type CameraShot = 'speaker' | 'wide' | 'medium' | 'closeup' | 'over_shoulder' | 'pov' | 'tracking' | 'panic' | 'freeze' | 'flicker';
+
+export interface DialogueLine {
+  speaker: string;  // character ID or 'narrator'
+  text: string;
+  mood?: 'neutral' | 'happy' | 'angry' | 'sad' | 'scared' | 'nervous' | 'determined' | 'serious' | 'warning' | 'somber' | 'hopeful';
+  animation?: AnimationType;
+  camera?: CameraShot;
+  duration?: number;  // Optional: ms to display (default auto-calc)
+  fearDelta?: number;  // Optional: fear increase during this line
+}
 
 export interface CharacterPosition {
   x: number;
   y: number;
   z: number;
+}
+
+export type NarratorPersonality = 'balanced' | 'brutal' | 'merciful' | 'chaotic';
+
+export interface BehavioralProfile {
+  recklessness: number;
+  loyalty: number;
+  deception: number;
+  survivalFocus: number;
+}
+
+export interface StoryMemoryEntry {
+  choiceId: string;
+  sceneId: string;
+  consequence: string;
+  behavioralDeltas?: Partial<BehavioralProfile>;
+}
+
+export interface ConversationMessage {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 interface GameState {
@@ -50,6 +105,20 @@ interface GameState {
   activeCharacter: string;
   wendigoActive: boolean;
   jumpScareActive: boolean;
+  currentSpeaker: string;
+  currentCameraShot: CameraShot;
+  // AI narrative engine
+  conversationHistory: ConversationMessage[];
+  storyMemory: StoryMemoryEntry[];
+  aiServiceStatus: 'healthy' | 'degraded' | 'offline';
+  // Inventory
+  inventory: InventoryItem[];
+  // Narrator personality
+  narratorPersonality: NarratorPersonality;
+  // Behavioral profile (4-axis, 0-100)
+  behavioralProfile: BehavioralProfile;
+  // Pause state (not persisted)
+  isPaused: boolean;
 
   // Actions
   setPhase: (phase: GamePhase) => void;
@@ -64,14 +133,15 @@ interface GameState {
   updateRelationship: (char1: string, char2: string, delta: number) => void;
   addClue: (clue: string) => void;
   incrementFear: (amount: number) => void;
+  setFearLevel: (level: number) => void;
   addConsequence: (consequence: string) => void;
   clearActiveConsequence: () => void;
   setCurrentEnvironment: (env: EnvironmentType) => void;
-  voiceEnabled: boolean;
   activateWendigo: () => void;
   triggerJumpScare: () => void;
   clearJumpScare: () => void;
-  toggleVoice: () => void;
+  setCurrentSpeaker: (speaker: string) => void;
+  setCurrentCameraShot: (shot: CameraShot) => void;
 
   qteActive: boolean;
   _qteCallbacks: { pass: (() => void) | null, fail: (() => void) | null };
@@ -79,7 +149,31 @@ interface GameState {
   passQTE: () => void;
   failQTE: () => void;
 
+  applyAIChanges: (aiResponse: {
+    characterDeath?: string;
+    butterflyEffect?: { id: string; choice: string };
+    relationshipChanges?: Array<{ character1: string; character2: string; delta: number }>;
+  }) => void;
+  getRelationship: (char1: string, char2: string) => number;
+  getButterflyChoice: (segmentId: string) => string | undefined;
+
   resetGame: () => void;
+
+  // AI state management
+  addToConversationHistory: (role: 'user' | 'assistant', content: string) => void;
+  addStoryMemory: (entry: StoryMemoryEntry) => void;
+  setAiServiceStatus: (status: 'healthy' | 'degraded' | 'offline') => void;
+
+  // Inventory
+  addItem: (item: InventoryItem) => void;
+  removeItem: (id: string) => void;
+  useItem: (id: string) => void;
+  // Narrator personality
+  setNarratorPersonality: (p: NarratorPersonality) => void;
+  // Behavioral profile
+  updateBehavioralProfile: (deltas: Partial<BehavioralProfile>) => void;
+  // Pause
+  togglePause: () => void;
 }
 
 const initialState = {
@@ -96,16 +190,20 @@ const initialState = {
     josh: 'alive',
     emily: 'alive',
     matt: 'alive',
+    hannah: 'alive',
+    beth: 'alive',
   } as Record<string, 'alive' | 'dead' | 'unknown'>,
   characterPositions: {
-    sam: { x: -3, y: 0, z: 5 },
-    mike: { x: 3, y: 0, z: 5 },
-    jessica: { x: -5, y: 0, z: 3 },
-    ashley: { x: 5, y: 0, z: 3 },
-    chris: { x: -2, y: 0, z: 7 },
-    josh: { x: 2, y: 0, z: 7 },
-    emily: { x: -4, y: 0, z: 4 },
-    matt: { x: 4, y: 0, z: 4 },
+    sam: { x: -2, y: 0, z: 2 },
+    mike: { x: 2, y: 0, z: 2 },
+    jessica: { x: 3, y: 0, z: 1 },
+    emily: { x: -3, y: 0, z: 1 },
+    ashley: { x: 1, y: 0, z: 3 },
+    chris: { x: -1, y: 0, z: 3 },
+    josh: { x: 0, y: 0, z: 3 },
+    matt: { x: 2, y: 0, z: 0 },
+    hannah: { x: -2, y: 0, z: 0 },
+    beth: { x: 0, y: 0, z: 2 },
   } as Record<string, CharacterPosition>,
   characterAnimations: {
     sam: 'idle',
@@ -116,6 +214,8 @@ const initialState = {
     josh: 'idle',
     emily: 'idle',
     matt: 'idle',
+    hannah: 'idle',
+    beth: 'idle',
   } as Record<string, AnimationType>,
   clues: [],
   fearLevel: 0,
@@ -132,15 +232,35 @@ const initialState = {
     emily: { bravery: 50, honesty: 50, curious: 50 },
     matt: { bravery: 50, honesty: 50, curious: 50 },
   },
-  relationships: {},
-  activeCharacter: 'sam',
-  wendigoActive: false,
-  jumpScareActive: false,
-  voiceEnabled: false,
-  qteActive: false,
+  relationships: {
+    sam_mike: { value: 60 },
+    sam_jessica: { value: 55 },
+    mike_jessica: { value: 70 },
+    chris_ashley: { value: 75 },
+    josh_sam: { value: 65 },
+    emily_matt: { value: 65 },
+  },
+   activeCharacter: 'sam',
+   wendigoActive: false,
+   jumpScareActive: false,
+   qteActive: false,
+  currentSpeaker: 'narrator',
+  currentCameraShot: 'wide' as CameraShot,
+  conversationHistory: [],
+  storyMemory: [],
+  aiServiceStatus: 'healthy' as const,
+  inventory: [],
+  narratorPersonality: 'balanced' as NarratorPersonality,
+  behavioralProfile: {
+    recklessness: 50,
+    loyalty: 50,
+    deception: 50,
+    survivalFocus: 50,
+  } as BehavioralProfile,
+  isPaused: false,
 };
 
-export const useGameStore = create<GameState>((set, get) => ({
+export const useGameStore = create<GameState>()(persist((set, get) => ({
   ...initialState,
 
   setPhase: (phase) => set({ phase }),
@@ -186,7 +306,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         ...state.relationships,
         [key]: {
           ...state.relationships[key],
-          value: Math.min(100, Math.max(0, (state.relationships[key] as any || { value: 50 }).value + delta))
+          value: Math.min(100, Math.max(0, ((state.relationships[key] as { value: number } | undefined)?.value ?? 50) + delta))
         }
       }
     };
@@ -200,6 +320,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     fearLevel: Math.min(100, Math.max(0, state.fearLevel + amount)),
   })),
 
+  setFearLevel: (level) => set({ fearLevel: level }),
+
   addConsequence: (consequence) => set((state) => ({
     consequences: [...state.consequences, consequence],
     activeConsequence: consequence,
@@ -212,7 +334,8 @@ export const useGameStore = create<GameState>((set, get) => ({
   activateWendigo: () => set({ wendigoActive: true }),
   triggerJumpScare: () => set({ jumpScareActive: true }),
   clearJumpScare: () => set({ jumpScareActive: false }),
-  toggleVoice: () => set((state) => ({ voiceEnabled: !state.voiceEnabled })),
+  setCurrentSpeaker: (speaker) => set({ currentSpeaker: speaker }),
+  setCurrentCameraShot: (shot) => set({ currentCameraShot: shot }),
 
   qteActive: false,
   _qteCallbacks: { pass: null as (() => void) | null, fail: null as (() => void) | null },
@@ -234,5 +357,95 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (_qteCallbacks?.fail) _qteCallbacks.fail();
   },
 
+  applyAIChanges: (aiResponse: {
+    characterDeath?: string;
+    butterflyEffect?: { id: string; choice: string };
+    relationshipChanges?: Array<{ character1: string; character2: string; delta: number }>;
+  }) => {
+    const state = get();
+
+    // Handle character death
+    if (aiResponse.characterDeath) {
+      state.updateCharacterState(aiResponse.characterDeath, 'dead');
+      state.addConsequence(`death_${aiResponse.characterDeath}`);
+    }
+
+    // Handle butterfly effect
+    if (aiResponse.butterflyEffect) {
+      state.setButterflyEffect(aiResponse.butterflyEffect.id, aiResponse.butterflyEffect.choice);
+      state.addConsequence(`butterfly_${aiResponse.butterflyEffect.id}`);
+    }
+
+    // Handle relationship changes
+    if (aiResponse.relationshipChanges) {
+      aiResponse.relationshipChanges.forEach(change => {
+        state.updateRelationship(change.character1, change.character2, change.delta);
+      });
+    }
+  },
+
+  getRelationship: (char1: string, char2: string): number => {
+    const state = get();
+    const key = [char1, char2].sort().join('_');
+    return (state.relationships[key] as { value: number } | undefined)?.value ?? 50;
+  },
+
+  getButterflyChoice: (segmentId: string): string | undefined => {
+    const state = get();
+    return state.butterflyEffects[segmentId];
+  },
+
   resetGame: () => set(initialState),
+
+  addToConversationHistory: (role, content) => set((state) => ({
+    conversationHistory: [
+      ...state.conversationHistory.slice(-9),
+      { role, content },
+    ],
+  })),
+
+  addStoryMemory: (entry) => set((state) => ({
+    storyMemory: [...state.storyMemory, entry],
+  })),
+
+  setAiServiceStatus: (status) => set({ aiServiceStatus: status }),
+
+  addItem: (item) => set((state) => ({
+    inventory: [...state.inventory, item],
+  })),
+
+  removeItem: (id) => set((state) => ({
+    inventory: state.inventory.filter((i) => i.id !== id),
+  })),
+
+  useItem: (id) => set((state) => ({
+    inventory: state.inventory.filter((i) => i.id !== id),
+  })),
+
+  setNarratorPersonality: (p) => set({ narratorPersonality: p }),
+
+  updateBehavioralProfile: (deltas) => set((state) => ({
+    behavioralProfile: {
+      recklessness: Math.min(100, Math.max(0, state.behavioralProfile.recklessness + (deltas.recklessness ?? 0))),
+      loyalty: Math.min(100, Math.max(0, state.behavioralProfile.loyalty + (deltas.loyalty ?? 0))),
+      deception: Math.min(100, Math.max(0, state.behavioralProfile.deception + (deltas.deception ?? 0))),
+      survivalFocus: Math.min(100, Math.max(0, state.behavioralProfile.survivalFocus + (deltas.survivalFocus ?? 0))),
+    },
+  })),
+
+  togglePause: () => set((state) => ({ isPaused: !state.isPaused })),
+}), {
+  name: 'frost-game-state',
+   partialize: (state) => ({
+     fearLevel: state.fearLevel,
+     characterStates: state.characterStates,
+     inventory: state.inventory,
+     storyMemory: state.storyMemory,
+     currentScene: state.currentScene,
+     playerChoices: state.playerChoices,
+     butterflyEffects: state.butterflyEffects,
+     relationships: state.relationships,
+     narratorPersonality: state.narratorPersonality,
+     behavioralProfile: state.behavioralProfile,
+   }),
 }));
