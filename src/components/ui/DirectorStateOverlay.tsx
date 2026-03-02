@@ -18,7 +18,7 @@ export default function DirectorStateOverlay() {
   const statusColor = aiServiceStatus === 'healthy' ? 'text-emerald-400' : aiServiceStatus === 'degraded' ? 'text-yellow-400' : 'text-red-400';
 
   return (
-    <div className="fixed left-4 bottom-4 z-50 pointer-events-auto">
+    <div className="fixed right-4 bottom-4 z-50 pointer-events-auto">
       <button
         onClick={toggleDirectorOverlay}
         className="mb-2 px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] border border-white/20 bg-black/60 text-gray-300 hover:text-white hover:border-white/40 transition-all"

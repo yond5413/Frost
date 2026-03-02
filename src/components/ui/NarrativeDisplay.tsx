@@ -45,6 +45,7 @@ export default function NarrativeDisplay() {
   const [lineVisible, setLineVisible] = useState(true);
   const [loadingLine] = useState(() => LOADING_LINES[Math.floor(Math.random() * LOADING_LINES.length)]);
   const aiTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiRequestIdRef = useRef(0);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -230,6 +231,9 @@ export default function NarrativeDisplay() {
         },
       });
 
+      const requestId = aiRequestIdRef.current + 1;
+      aiRequestIdRef.current = requestId;
+
       setIsGeneratingAI(true);
       addToConversationHistory('user', `Scene: ${currentScene}`);
 
@@ -243,6 +247,7 @@ export default function NarrativeDisplay() {
 
       // 10-second timeout — fall back to static dialogue if AI is too slow
       aiTimeoutRef.current = setTimeout(() => {
+        if (aiRequestIdRef.current !== requestId) return;
         recordAiFallback('timeout_static_dialogue', true);
         logRuntimeWarn('ai_decision_timeout_fallback', {
           sceneId: currentScene,
@@ -255,6 +260,7 @@ export default function NarrativeDisplay() {
           },
         });
 
+        aiRequestIdRef.current += 1;
         setIsGeneratingAI(false);
         setAiServiceStatus('degraded');
         if (availableRoutes.length > 0) {
@@ -279,6 +285,7 @@ export default function NarrativeDisplay() {
         behavioralProfile,
       })
         .then((result) => {
+          if (aiRequestIdRef.current !== requestId) return;
           if (aiTimeoutRef.current) { clearTimeout(aiTimeoutRef.current); aiTimeoutRef.current = null; }
           setIsGeneratingAI(false);
           if (result) {
@@ -378,6 +385,7 @@ export default function NarrativeDisplay() {
           }
         })
         .catch(() => {
+          if (aiRequestIdRef.current !== requestId) return;
           recordAiFallback('request_failed');
           logRuntimeError('ai_decision_request_failed', {
             sceneId: currentScene,

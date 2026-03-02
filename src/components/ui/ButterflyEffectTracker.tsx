@@ -41,9 +41,9 @@ export default function ButterflyEffectTracker() {
           {/* Entries */}
           <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-2 space-y-3 scrollbar-none">
             {storyMemory.slice().reverse().map((entry, i) => (
-              <div key={entry.choiceId} className="border-l border-white/10 pl-2">
+              <div key={`${entry.choiceId}-${entry.sceneId}-${i}`} className="border-l border-white/10 pl-2">
                 <p className="text-gray-400 text-xs leading-relaxed">
-                  {entry.consequence}
+                  {entry.consequence || 'A consequence was recorded, but details were lost in the storm.'}
                 </p>
                 <p className="text-gray-600 italic text-[10px] mt-1">
                   {getObservation(storyMemory.length - 1 - i)}
