@@ -97,6 +97,98 @@ function isNarratorModeResponse(value: unknown): value is NarratorModeResponse {
   return typeof value.narratorText === 'string';
 }
 
+
+const AI_REQUEST_TIMEOUT_MS = 8000;
+const AI_MAX_RETRIES = 2;
+
+function clampFearDelta(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+  return Math.max(-30, Math.min(40, Math.round(value)));
+}
+
+function sanitizeDirectorResponse(
+  payload: DirectorModeResponse,
+  availableRoutes: Array<{ id: string; text: string; nextScene: string; fearDelta?: number }>,
+  fear: number
+): DirectorModeResponse {
+  const validRoute = availableRoutes.some((route) => route.nextScene === payload.chosenRoute)
+    ? payload.chosenRoute
+    : (availableRoutes[0]?.nextScene ?? '');
+
+  return {
+    ...payload,
+    chosenRoute: validRoute,
+    narratorText: payload.narratorText?.trim() || getFallback(fear).narratorText,
+    consequence: payload.consequence?.trim() || 'A quiet decision altered the night.',
+    fearDelta: clampFearDelta(payload.fearDelta, 5),
+  };
+}
+
+function sanitizeNarratorResponse(payload: NarratorModeResponse, fear: number): NarratorModeResponse {
+  const sanitizedChoices = (payload.choices ?? [])
+    .filter((choice) => typeof choice.id === 'string' && typeof choice.text === 'string' && typeof choice.nextScene === 'string')
+    .map((choice) => ({
+      ...choice,
+      fearDelta: clampFearDelta(choice.fearDelta, 0),
+    }));
+
+  return {
+    ...payload,
+    narratorText: payload.narratorText?.trim() || getFallback(fear).narratorText,
+    fearDelta: clampFearDelta(payload.fearDelta, 5),
+    choices: sanitizedChoices,
+  };
+}
+
+async function requestMistralWithRetry(payload: Record<string, unknown>, apiKey: string, sceneId: string, mode: 'ai' | 'deterministic'): Promise<Response> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= AI_MAX_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
+
+    try {
+      logRuntimeInfo('story_api_upstream_attempt', {
+        sceneId,
+        source: 'generate-story-route',
+        mode,
+        details: { attempt: attempt + 1, maxRetries: AI_MAX_RETRIES },
+      });
+
+      const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      if (response.ok) {
+        clearTimeout(timeout);
+        return response;
+      }
+
+      if (response.status >= 500 && attempt < AI_MAX_RETRIES) {
+        clearTimeout(timeout);
+        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+        continue;
+      }
+
+      clearTimeout(timeout);
+      return response;
+    } catch (err) {
+      clearTimeout(timeout);
+      lastError = err;
+      if (attempt >= AI_MAX_RETRIES) break;
+      await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Failed to reach Mistral API');
+}
+
 const PERSONALITY_CONFIG = {
   balanced: { temperature: 0.85, deathThreshold: 60, deathChance: 0.25, label: 'The Auteur', persona: 'You decide outcomes with care. Every consequence earns its weight.' },
   brutal: { temperature: 0.95, deathThreshold: 40, deathChance: 0.60, label: 'The Reaper', persona: 'You are merciless. Survival is earned, not given. Choose the hardest path when darkness is justified.' },
@@ -327,20 +419,13 @@ Respond ONLY in this exact JSON format:
   ];
 
   try {
-    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'mistral-large-latest',
-        messages,
-        response_format: { type: 'json_object' },
-        temperature: personalityConfig.temperature,
-        max_tokens: maxTokens,
-      }),
-    });
+    const response = await requestMistralWithRetry({
+      model: 'mistral-large-latest',
+      messages,
+      response_format: { type: 'json_object' },
+      temperature: personalityConfig.temperature,
+      max_tokens: maxTokens,
+    }, apiKey, currentScene, isDirectorMode ? 'ai' : 'deterministic');
 
     if (!response.ok) {
       logRuntimeWarn('story_api_upstream_non_ok', {
@@ -398,7 +483,7 @@ Respond ONLY in this exact JSON format:
         mode: 'ai',
         details: { chosenRoute: content.chosenRoute },
       });
-      return NextResponse.json(content);
+      return NextResponse.json(sanitizeDirectorResponse(content, availableRoutes, fearLevel ?? 0));
     }
 
     if (!isNarratorModeResponse(content)) {
@@ -416,7 +501,7 @@ Respond ONLY in this exact JSON format:
       source: 'generate-story-route',
       mode: 'deterministic',
     });
-    return NextResponse.json(content);
+    return NextResponse.json(sanitizeNarratorResponse(content, fearLevel ?? 0));
   } catch (err) {
     logRuntimeError('story_api_request_failed', {
       sceneId: currentScene,
