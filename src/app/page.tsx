@@ -18,6 +18,7 @@ import CharacterDeathEffects from '@/components/ui/CharacterDeathEffects';
  import DeathRecap from '@/components/ui/DeathRecap';
  import SurvivalScreen from '@/components/ui/SurvivalScreen';
 import PauseMenu from '@/components/ui/PauseMenu';
+import DirectorStateOverlay from '@/components/ui/DirectorStateOverlay';
 import { useMusicSync } from '@/lib/musicManager';
 import { NarratorPersonality } from '@/lib/store';
 
@@ -46,7 +47,7 @@ const PERSONALITY_OPTIONS: Array<{
 ];
 
 export default function GamePage() {
-  const { phase, setPhase, currentScene, setCurrentScene, setCurrentEnvironment, fearLevel, jumpScareActive, narratorPersonality, setNarratorPersonality, isPaused, togglePause, resetGame } =
+  const { phase, setPhase, currentScene, setCurrentScene, setCurrentEnvironment, fearLevel, jumpScareActive, narratorPersonality, setNarratorPersonality, isPaused, togglePause, resetGame, setDemoSeedMode } =
     useGameStore();
 
   useMusicSync(fearLevel, jumpScareActive);
@@ -82,15 +83,28 @@ export default function GamePage() {
     const personality = narratorPersonality;
     resetGame();
     setNarratorPersonality(personality);
+    setDemoSeedMode(false);
     setPhase('scene');
     setCurrentEnvironment('lodge');
     setCurrentScene('prologue_start');
   };
 
   const handleSkipToCh2 = () => {
+    setDemoSeedMode(false);
     setPhase('scene');
     setCurrentEnvironment('cabin');
     setCurrentScene('chapter2_start');
+  };
+
+  const handleDemoSeedRun = () => {
+    const personality = narratorPersonality;
+    resetGame();
+    setNarratorPersonality(personality);
+    setDemoSeedMode(false);
+    setDemoSeedMode(true);
+    setPhase('scene');
+    setCurrentEnvironment('lodge');
+    setCurrentScene('prologue_start');
   };
 
   // Fear-based visual effects via CSS
@@ -112,6 +126,7 @@ export default function GamePage() {
       />
 
       <GameHUD />
+      <DirectorStateOverlay />
 
       {phase === 'intro' && (
         <div className="absolute inset-0 z-40 overflow-hidden flex flex-col items-center justify-center">
@@ -186,6 +201,13 @@ export default function GamePage() {
               );
             })}
           </div>
+
+          <button
+            onClick={handleDemoSeedRun}
+            className="relative z-10 w-56 px-8 py-3 text-[10px] tracking-[0.25em] uppercase text-cyan-300 border border-cyan-800/50 hover:border-cyan-500/70 hover:bg-cyan-900/10 transition-all duration-300 mb-3"
+          >
+            Demo Seed Run
+          </button>
 
           {/* Dev skip */}
           <button

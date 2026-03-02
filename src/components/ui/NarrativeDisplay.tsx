@@ -4,10 +4,59 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore, Choice } from '@/lib/store';
 import { getScene } from '@/data/story';
 import { useMistralAI } from '@/lib/mistral';
+import { useVoice } from '@/hooks/useVoice';
+import { logRuntimeInfo, logRuntimeWarn, logRuntimeError } from '@/lib/runtimeLogger';
 
 import CharacterPortrait from './CharacterPortrait';
 import ConsequencePopup from './ConsequencePopup';
 import { getCharacter } from '@/data/characters';
+
+
+const LOCK_IN_CHOICE_RULES = {
+  ch4_split_decision: (choices: Choice[], butterflyEffects: Record<string, string>): Choice[] => {
+    if (!butterflyEffects.totem_taken) return choices;
+    return [
+      ...choices,
+      {
+        id: 'lockin_totem_safe_path',
+        text: 'Use the totem marks to pick the safer ridge route',
+        nextScene: 'chapter5_start',
+        fearDelta: 5,
+        consequence: 'Lock-in: The totem guided your route through the storm.',
+      },
+    ];
+  },
+  chapter5_start: (choices: Choice[], butterflyEffects: Record<string, string>): Choice[] => {
+    if (!butterflyEffects.learned_history) return choices;
+    return [
+      ...choices,
+      {
+        id: 'lockin_use_wards',
+        text: "Use the stranger's warding knowledge to slow the hunt",
+        nextScene: 'ch5_prepare',
+        fearDelta: 8,
+        consequence: 'Lock-in: Knowledge from the clipping gave you one tactical edge.',
+      },
+    ];
+  },
+  ch5_prepare: (choices: Choice[], butterflyEffects: Record<string, string>): Choice[] => {
+    if (!butterflyEffects.lone_wolf) return choices;
+    return [
+      {
+        id: 'lockin_lone_wolf_final',
+        text: 'Go alone as bait — no one trusts a group push now',
+        nextScene: 'ending_sacrifice',
+        fearDelta: 45,
+        consequence: 'Lock-in: Earlier isolation fractured the group at the worst moment.',
+      },
+    ];
+  },
+} as const;
+
+function applyLockInChoices(sceneId: string, choices: Choice[], butterflyEffects: Record<string, string>): Choice[] {
+  const rule = LOCK_IN_CHOICE_RULES[sceneId as keyof typeof LOCK_IN_CHOICE_RULES];
+  return rule ? rule(choices, butterflyEffects) : choices;
+}
 
 const LOADING_LINES = [
   'The mountain holds its breath...',
@@ -20,7 +69,7 @@ const LOADING_LINES = [
 export default function NarrativeDisplay() {
   const {
     phase, currentScene, setPhase, makeChoice, setCurrentScene,
-    addConsequence, setCurrentEnvironment,
+    addConsequence, setCurrentEnvironment, setButterflyEffect,
     fearLevel, incrementFear, setFearLevel,
     wendigoActive, activateWendigo, triggerJumpScare,
     playerChoices, characterStates, characterTraits, relationships, butterflyEffects,
@@ -28,8 +77,10 @@ export default function NarrativeDisplay() {
     setCurrentSpeaker, setCurrentCameraShot,
     setCharacterAnimation,
     conversationHistory, addToConversationHistory, addStoryMemory, setAiServiceStatus, aiServiceStatus,
+    recordRuntimeDecision, recordAiFallback,
     storyMemory,
     narratorPersonality, behavioralProfile, updateBehavioralProfile,
+    demoSeedMode, voiceEnabled,
   } = useGameStore();
 
   const scene = getScene(currentScene);
@@ -43,6 +94,7 @@ export default function NarrativeDisplay() {
   const [lineVisible, setLineVisible] = useState(true);
   const [loadingLine] = useState(() => LOADING_LINES[Math.floor(Math.random() * LOADING_LINES.length)]);
   const aiTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiRequestIdRef = useRef(0);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,11 +105,13 @@ export default function NarrativeDisplay() {
   // Always-current refs to avoid stale closures in startTypewriter/handleSkip
   const sceneRef = useRef(scene);
   const aiChoicesRef = useRef(aiChoices);
+  const lastSpokenLineKeyRef = useRef<string>('');
 
   sceneRef.current = scene;
   aiChoicesRef.current = aiChoices;
 
   const { generateStory } = useMistralAI();
+  const { speak, cancel } = useVoice();
 
   // Keep totalLinesRef in sync
   useEffect(() => {
@@ -188,15 +242,49 @@ export default function NarrativeDisplay() {
     if (scene.fearReset) setFearLevel(0);
     if (scene.environment) setCurrentEnvironment(scene.environment);
 
+    logRuntimeInfo('scene_enter', {
+      sceneId: currentScene,
+      phase,
+      source: 'NarrativeDisplay',
+      mode: scene.aiDriven ? 'ai' : 'deterministic',
+      details: {
+        hasChoices: Boolean(scene.choices?.length),
+        hasInteractables: Boolean(scene.interactables?.length),
+      },
+    });
+
+    recordRuntimeDecision(scene.aiDriven ? 'ai' : 'deterministic', scene.aiDriven ? 'scene_enter_ai' : 'scene_enter_deterministic');
+
     const dialogueLine = scene.dialogue[0];
     if (!dialogueLine) {
       if (scene.choices && scene.choices.length > 0) {
+        logRuntimeInfo('scene_no_dialogue_show_choices', {
+          sceneId: currentScene,
+          phase,
+          source: 'NarrativeDisplay',
+          mode: 'deterministic',
+        });
         setShowChoices(true);
       }
       return;
     }
 
     if (scene.aiDriven) {
+      logRuntimeInfo('ai_decision_start', {
+        sceneId: currentScene,
+        phase,
+        source: 'NarrativeDisplay',
+        mode: 'ai',
+        details: {
+          availableRouteCount: (scene.choices || []).length,
+          storyMemoryEntries: storyMemory.length,
+          aiServiceStatus,
+        },
+      });
+
+      const requestId = aiRequestIdRef.current + 1;
+      aiRequestIdRef.current = requestId;
+
       setIsGeneratingAI(true);
       addToConversationHistory('user', `Scene: ${currentScene}`);
 
@@ -208,8 +296,44 @@ export default function NarrativeDisplay() {
         fearDelta: c.fearDelta,
       }));
 
+      if (demoSeedMode) {
+        const seededRoute = availableRoutes.length > 0
+          ? (fearLevel > 60 ? availableRoutes[availableRoutes.length - 1] : availableRoutes[0])
+          : null;
+
+        recordRuntimeDecision('deterministic', 'demo_seed_ai_bypass');
+        setAiServiceStatus('degraded');
+        setIsGeneratingAI(false);
+
+        if (seededRoute) {
+          aiChosenRouteRef.current = seededRoute.nextScene;
+          addStoryMemory({
+            choiceId: `seed_${currentScene}`,
+            sceneId: currentScene,
+            consequence: `Demo seed selected route → ${seededRoute.nextScene}`,
+          });
+        }
+
+        startTypewriter(dialogueLine.text || '', 0);
+        return;
+      }
+
       // 10-second timeout — fall back to static dialogue if AI is too slow
       aiTimeoutRef.current = setTimeout(() => {
+        if (aiRequestIdRef.current !== requestId) return;
+        recordAiFallback('timeout_static_dialogue', true);
+        logRuntimeWarn('ai_decision_timeout_fallback', {
+          sceneId: currentScene,
+          phase,
+          source: 'NarrativeDisplay',
+          mode: 'ai',
+          details: {
+            timeoutMs: 10000,
+            fallbackRoute: availableRoutes[0]?.nextScene ?? null,
+          },
+        });
+
+        aiRequestIdRef.current += 1;
         setIsGeneratingAI(false);
         setAiServiceStatus('degraded');
         if (availableRoutes.length > 0) {
@@ -234,9 +358,23 @@ export default function NarrativeDisplay() {
         behavioralProfile,
       })
         .then((result) => {
+          if (aiRequestIdRef.current !== requestId) return;
           if (aiTimeoutRef.current) { clearTimeout(aiTimeoutRef.current); aiTimeoutRef.current = null; }
           setIsGeneratingAI(false);
           if (result) {
+            recordRuntimeDecision('ai', result.chosenRoute ? 'ai_route_selected' : 'ai_narration_generated');
+            logRuntimeInfo('ai_decision_success', {
+              sceneId: currentScene,
+              phase,
+              source: 'NarrativeDisplay',
+              mode: 'ai',
+              details: {
+                chosenRoute: result.chosenRoute ?? null,
+                hasChoices: Boolean(result.choices?.length),
+                fearDelta: result.fearDelta ?? 0,
+              },
+            });
+
             setAiServiceStatus('healthy');
             addToConversationHistory('assistant', result.narratorText || '');
 
@@ -300,6 +438,17 @@ export default function NarrativeDisplay() {
               }
             }
           } else {
+            recordAiFallback('empty_ai_result');
+            logRuntimeWarn('ai_decision_empty_result_fallback', {
+              sceneId: currentScene,
+              phase,
+              source: 'NarrativeDisplay',
+              mode: 'ai',
+              details: {
+                fallbackRoute: availableRoutes[0]?.nextScene ?? null,
+              },
+            });
+
             setAiServiceStatus('degraded');
             // Fallback: use first available route
             if (availableRoutes.length > 0) {
@@ -309,6 +458,18 @@ export default function NarrativeDisplay() {
           }
         })
         .catch(() => {
+          if (aiRequestIdRef.current !== requestId) return;
+          recordAiFallback('request_failed');
+          logRuntimeError('ai_decision_request_failed', {
+            sceneId: currentScene,
+            phase,
+            source: 'NarrativeDisplay',
+            mode: 'ai',
+            details: {
+              fallbackRoute: (scene.choices || [])[0]?.nextScene ?? null,
+            },
+          });
+
           if (aiTimeoutRef.current) { clearTimeout(aiTimeoutRef.current); aiTimeoutRef.current = null; }
           setIsGeneratingAI(false);
           setAiServiceStatus('offline');
@@ -320,6 +481,18 @@ export default function NarrativeDisplay() {
           startTypewriter(dialogueLine.text || '', 0);
         });
     } else {
+      recordRuntimeDecision('deterministic', 'deterministic_scene_line_start');
+      logRuntimeInfo('deterministic_scene_line_start', {
+        sceneId: currentScene,
+        phase,
+        source: 'NarrativeDisplay',
+        mode: 'deterministic',
+        details: {
+          lineIndex: 0,
+          speaker: dialogueLine.speaker,
+        },
+      });
+
       if (dialogueLine.fearDelta) incrementFear(dialogueLine.fearDelta);
       if (dialogueLine.speaker !== 'narrator') {
         setCharacterAnimation(dialogueLine.speaker, dialogueLine.animation || 'talking');
@@ -371,8 +544,32 @@ export default function NarrativeDisplay() {
   }, []);
 
   const handleChoiceSelect = (choice: Choice) => {
+    recordRuntimeDecision(scene.aiDriven ? 'ai' : 'deterministic', `choice_selected:${choice.id}`);
+    addStoryMemory({
+      choiceId: choice.id,
+      sceneId: currentScene,
+      consequence: choice.consequence || `Route selected → ${choice.nextScene}`,
+    });
+    logRuntimeInfo('player_choice_selected', {
+      sceneId: currentScene,
+      phase,
+      source: 'NarrativeDisplay',
+      mode: scene.aiDriven ? 'ai' : 'deterministic',
+      details: {
+        choiceId: choice.id,
+        nextScene: choice.nextScene,
+        fearDelta: choice.fearDelta ?? 0,
+      },
+    });
+
     makeChoice(choice.id);
-    if (choice.consequence) addConsequence(choice.consequence);
+    if (choice.consequence) {
+      addConsequence(choice.consequence);
+      if (choice.consequence.startsWith('butterfly_')) {
+        const segmentId = choice.consequence.replace('butterfly_', '');
+        setButterflyEffect(segmentId, choice.id);
+      }
+    }
 
     const targetScene = getScene(choice.nextScene);
     setCurrentEnvironment(targetScene?.environment || scene.environment || 'lodge');
@@ -408,12 +605,36 @@ export default function NarrativeDisplay() {
   // Prefer AI dialogue lines over static scene dialogue
   const activeDialogue = aiDialogueLines.length > 0 ? aiDialogueLines : scene.dialogue;
   const currentDialogueLine = activeDialogue[currentLineIndex] || null;
-  const choicesToShow = aiChoices.length > 0 ? aiChoices : (scene.choices || []);
+  const rawChoicesToShow = aiChoices.length > 0 ? aiChoices : (scene.choices || []);
+  const choicesToShow = applyLockInChoices(currentScene, rawChoicesToShow, butterflyEffects);
   const isNarrator = currentDialogueLine?.speaker === 'narrator';
   // Director mode is active when the scene is aiDriven and we've received (or are waiting for) a chosen route
   const isDirectorMode = scene.aiDriven === true;
 
   const aiStatusColor = aiServiceStatus === 'healthy' ? '#22c55e' : aiServiceStatus === 'degraded' ? '#eab308' : '#ef4444';
+
+  useEffect(() => {
+    if (!voiceEnabled) {
+      lastSpokenLineKeyRef.current = '';
+      cancel();
+      return;
+    }
+
+    if (phase !== 'scene' && phase !== 'choice') {
+      lastSpokenLineKeyRef.current = '';
+      cancel();
+      return;
+    }
+
+    if (!currentDialogueLine) return;
+    if (currentDialogueLine.speaker === 'narrator') return;
+
+    const lineKey = `${currentScene}:${currentLineIndex}:${currentDialogueLine.speaker}:${currentDialogueLine.text}`;
+    if (lineKey === lastSpokenLineKeyRef.current) return;
+
+    lastSpokenLineKeyRef.current = lineKey;
+    void speak(currentDialogueLine.text || '', currentDialogueLine.speaker);
+  }, [voiceEnabled, currentDialogueLine, currentLineIndex, currentScene, phase, speak, cancel]);
 
   if (phase !== 'scene' && phase !== 'choice') return null;
   if (!currentDialogueLine && !isGeneratingAI) return null;

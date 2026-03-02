@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logRuntimeInfo, logRuntimeWarn, logRuntimeError } from '@/lib/runtimeLogger';
 
 // Fallback scenes for when AI is unavailable
 const FALLBACK_SCENES = [
@@ -96,6 +97,135 @@ function isNarratorModeResponse(value: unknown): value is NarratorModeResponse {
   return typeof value.narratorText === 'string';
 }
 
+
+const AI_REQUEST_TIMEOUT_MS = 8000;
+const AI_MAX_RETRIES = 2;
+
+function clampFearDelta(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+  return Math.max(-30, Math.min(40, Math.round(value)));
+}
+
+function sanitizeDirectorResponse(
+  payload: DirectorModeResponse,
+  availableRoutes: Array<{ id: string; text: string; nextScene: string; fearDelta?: number }>,
+  fear: number
+): DirectorModeResponse {
+  const validRoute = availableRoutes.some((route) => route.nextScene === payload.chosenRoute)
+    ? payload.chosenRoute
+    : (availableRoutes[0]?.nextScene ?? '');
+
+  return {
+    ...payload,
+    chosenRoute: validRoute,
+    narratorText: payload.narratorText?.trim() || getFallback(fear).narratorText,
+    consequence: payload.consequence?.trim() || 'A quiet decision altered the night.',
+    fearDelta: clampFearDelta(payload.fearDelta, 5),
+    relationshipChanges: sanitizeRelationshipChanges(payload.relationshipChanges),
+    butterflyEffect: sanitizeButterflyEffect(payload.butterflyEffect),
+  };
+}
+
+
+function sanitizeRelationshipChanges(value: unknown): Array<{ character1: string; character2: string; delta: number }> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry) => isObject(entry) && typeof entry.character1 === 'string' && typeof entry.character2 === 'string')
+    .map((entry) => ({
+      character1: String(entry.character1),
+      character2: String(entry.character2),
+      delta: clampFearDelta((entry as Record<string, unknown>).delta, 0),
+    }));
+}
+
+function sanitizeButterflyEffect(value: unknown): { id: string; choice: string } | null {
+  if (!isObject(value)) return null;
+  if (typeof value.id !== 'string' || typeof value.choice !== 'string') return null;
+  return { id: value.id, choice: value.choice };
+}
+
+function sanitizeDialogueLines(value: unknown): Array<{ speaker: string; text: string; mood?: string; cameraShot?: string }> {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .filter((line) => isObject(line) && typeof line.speaker === 'string' && typeof line.text === 'string')
+    .map((line) => ({
+      speaker: String(line.speaker),
+      text: String(line.text).trim(),
+      mood: typeof line.mood === 'string' ? line.mood : undefined,
+      cameraShot: typeof line.cameraShot === 'string' ? line.cameraShot : undefined,
+    }))
+    .filter((line) => line.text.length > 0);
+}
+
+function sanitizeNarratorResponse(payload: NarratorModeResponse, fear: number): NarratorModeResponse {
+  const sanitizedChoices = (payload.choices ?? [])
+    .filter((choice) => typeof choice.id === 'string' && typeof choice.text === 'string' && typeof choice.nextScene === 'string')
+    .map((choice) => ({
+      ...choice,
+      fearDelta: clampFearDelta(choice.fearDelta, 0),
+    }));
+
+  return {
+    ...payload,
+    narratorText: payload.narratorText?.trim() || getFallback(fear).narratorText,
+    fearDelta: clampFearDelta(payload.fearDelta, 5),
+    choices: sanitizedChoices,
+    dialogueLines: sanitizeDialogueLines(payload.dialogueLines),
+    relationshipChanges: sanitizeRelationshipChanges(payload.relationshipChanges),
+    butterflyEffect: sanitizeButterflyEffect(payload.butterflyEffect),
+  };
+}
+
+async function requestMistralWithRetry(payload: Record<string, unknown>, apiKey: string, sceneId: string, mode: 'ai' | 'deterministic'): Promise<Response> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= AI_MAX_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), AI_REQUEST_TIMEOUT_MS);
+
+    try {
+      logRuntimeInfo('story_api_upstream_attempt', {
+        sceneId,
+        source: 'generate-story-route',
+        mode,
+        details: { attempt: attempt + 1, maxRetries: AI_MAX_RETRIES },
+      });
+
+      const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      if (response.ok) {
+        clearTimeout(timeout);
+        return response;
+      }
+
+      if (response.status >= 500 && attempt < AI_MAX_RETRIES) {
+        clearTimeout(timeout);
+        await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+        continue;
+      }
+
+      clearTimeout(timeout);
+      return response;
+    } catch (err) {
+      clearTimeout(timeout);
+      lastError = err;
+      if (attempt >= AI_MAX_RETRIES) break;
+      await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Failed to reach Mistral API');
+}
+
 const PERSONALITY_CONFIG = {
   balanced: { temperature: 0.85, deathThreshold: 60, deathChance: 0.25, label: 'The Auteur', persona: 'You decide outcomes with care. Every consequence earns its weight.' },
   brutal: { temperature: 0.95, deathThreshold: 40, deathChance: 0.60, label: 'The Reaper', persona: 'You are merciless. Survival is earned, not given. Choose the hardest path when darkness is justified.' },
@@ -130,10 +260,32 @@ export async function POST(request: Request) {
   // Director mode: availableRoutes provided and non-empty
   const isDirectorMode = Array.isArray(availableRoutes) && availableRoutes.length > 0;
 
+  logRuntimeInfo('story_api_request_received', {
+    sceneId: currentScene,
+    source: 'generate-story-route',
+    mode: isDirectorMode ? 'ai' : 'deterministic',
+    details: {
+      hasApiKey: Boolean(apiKey),
+      fearLevel: fearLevel ?? 0,
+      availableRouteCount: Array.isArray(availableRoutes) ? availableRoutes.length : 0,
+      storyMemoryEntries: Array.isArray(storyMemory) ? storyMemory.length : 0,
+    },
+  });
+
   if (!apiKey) {
     if (isDirectorMode) {
+      logRuntimeWarn('story_api_missing_key_director_fallback', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: 'ai',
+      });
       return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
     }
+    logRuntimeWarn('story_api_missing_key_narrator_fallback', {
+      sceneId: currentScene,
+      source: 'generate-story-route',
+      mode: 'deterministic',
+    });
     return NextResponse.json(getFallback(fearLevel ?? 0));
   }
 
@@ -276,6 +428,7 @@ RULES:
 4. Only include characterDeath if fear > ${personalityConfig.deathThreshold} AND the scene context strongly suggests it (${Math.round(personalityConfig.deathChance * 100)}% chance).
 5. Relationship changes should feel earned by the scene context.
 6. Keep cameraShot values to one of: speaker, wide, medium, closeup, over_shoulder, pov, tracking, panic, freeze, flicker.
+7. The old mountain guide must be speaker "stranger" (or "hunter"), never "narrator" when he is talking.
 
 Respond ONLY in this exact JSON format:
 {
@@ -304,22 +457,21 @@ Respond ONLY in this exact JSON format:
   ];
 
   try {
-    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'mistral-large-latest',
-        messages,
-        response_format: { type: 'json_object' },
-        temperature: personalityConfig.temperature,
-        max_tokens: maxTokens,
-      }),
-    });
+    const response = await requestMistralWithRetry({
+      model: 'mistral-large-latest',
+      messages,
+      response_format: { type: 'json_object' },
+      temperature: personalityConfig.temperature,
+      max_tokens: maxTokens,
+    }, apiKey, currentScene, isDirectorMode ? 'ai' : 'deterministic');
 
     if (!response.ok) {
+      logRuntimeWarn('story_api_upstream_non_ok', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: isDirectorMode ? 'ai' : 'deterministic',
+        details: { status: response.status },
+      });
       console.error(`Mistral API error: ${response.status}`);
       if (isDirectorMode) return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
       return NextResponse.json(getFallback(fearLevel ?? 0));
@@ -329,6 +481,11 @@ Respond ONLY in this exact JSON format:
     const rawContent = data?.choices?.[0]?.message?.content;
 
     if (typeof rawContent !== 'string') {
+      logRuntimeWarn('story_api_invalid_content_payload', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: isDirectorMode ? 'ai' : 'deterministic',
+      });
       console.error('Mistral API returned invalid content payload');
       if (isDirectorMode) return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
       return NextResponse.json(getFallback(fearLevel ?? 0));
@@ -338,6 +495,11 @@ Respond ONLY in this exact JSON format:
     try {
       content = JSON.parse(rawContent);
     } catch (parseErr) {
+      logRuntimeWarn('story_api_json_parse_failure', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: isDirectorMode ? 'ai' : 'deterministic',
+      });
       console.error('Failed to parse Mistral JSON response:', parseErr);
       if (isDirectorMode) return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
       return NextResponse.json(getFallback(fearLevel ?? 0));
@@ -345,19 +507,45 @@ Respond ONLY in this exact JSON format:
 
     if (isDirectorMode) {
       if (!isDirectorModeResponse(content)) {
+        logRuntimeWarn('story_api_invalid_director_shape', {
+          sceneId: currentScene,
+          source: 'generate-story-route',
+          mode: 'ai',
+        });
         console.error('Invalid director response shape from Mistral');
         return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
       }
-      return NextResponse.json(content);
+      logRuntimeInfo('story_api_director_response_ok', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: 'ai',
+        details: { chosenRoute: content.chosenRoute },
+      });
+      return NextResponse.json(sanitizeDirectorResponse(content, availableRoutes, fearLevel ?? 0));
     }
 
     if (!isNarratorModeResponse(content)) {
+      logRuntimeWarn('story_api_invalid_narrator_shape', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: 'deterministic',
+      });
       console.error('Invalid narrator response shape from Mistral');
       return NextResponse.json(getFallback(fearLevel ?? 0));
     }
 
-    return NextResponse.json(content);
+    logRuntimeInfo('story_api_narrator_response_ok', {
+      sceneId: currentScene,
+      source: 'generate-story-route',
+      mode: 'deterministic',
+    });
+    return NextResponse.json(sanitizeNarratorResponse(content, fearLevel ?? 0));
   } catch (err) {
+    logRuntimeError('story_api_request_failed', {
+      sceneId: currentScene,
+      source: 'generate-story-route',
+      mode: isDirectorMode ? 'ai' : 'deterministic',
+    });
     console.error('Story generation failed:', err);
     if (isDirectorMode) return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
     return NextResponse.json(getFallback(fearLevel ?? 0));

@@ -122,6 +122,162 @@ function Eyebrows({ mood = 'neutral', intensity = 1 }: { mood?: string; intensit
   );
 }
 
+
+function CharacterAccessory({ characterId, headY }: { characterId: string; headY: number }) {
+  if (characterId === 'chris') {
+    return (
+      <group position={[0, headY, 0.19]}>
+        <mesh position={[-0.08, 0.04, 0]}>
+          <torusGeometry args={[0.04, 0.006, 10, 20]} />
+          <meshStandardMaterial color="#111111" metalness={0.4} roughness={0.35} />
+        </mesh>
+        <mesh position={[0.08, 0.04, 0]}>
+          <torusGeometry args={[0.04, 0.006, 10, 20]} />
+          <meshStandardMaterial color="#111111" metalness={0.4} roughness={0.35} />
+        </mesh>
+        <mesh position={[0, 0.04, 0]}>
+          <boxGeometry args={[0.05, 0.008, 0.006]} />
+          <meshStandardMaterial color="#111111" metalness={0.4} roughness={0.35} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (characterId === 'ashley') {
+    return (
+      <mesh position={[0, headY + 0.16, 0]}>
+        <sphereGeometry args={[0.24, 18, 18, 0, Math.PI * 2, 0, Math.PI * 0.45]} />
+        <meshStandardMaterial color="#2b2f42" roughness={0.8} />
+      </mesh>
+    );
+  }
+
+  if (characterId === 'stranger' || characterId === 'hunter') {
+    return (
+      <group>
+        <mesh position={[0, headY + 0.11, 0]}>
+          <cylinderGeometry args={[0.19, 0.22, 0.16, 18]} />
+          <meshStandardMaterial color="#3e3a32" roughness={0.85} />
+        </mesh>
+        <mesh position={[0, headY + 0.03, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.2, 0.025, 12, 24]} />
+          <meshStandardMaterial color="#3e3a32" roughness={0.85} />
+        </mesh>
+      </group>
+    );
+  }
+
+  return null;
+}
+
+function CharacterOutfitDetail({ characterId, torsoWidth, torsoHeight, height }: { characterId: string; torsoWidth: number; torsoHeight: number; height: number }) {
+  if (characterId === 'sam') {
+    return (
+      <mesh position={[0, height * 0.56, torsoWidth * 0.33]}>
+        <boxGeometry args={[torsoWidth * 0.82, torsoHeight * 0.7, 0.08]} />
+        <meshStandardMaterial color="#5f6f91" roughness={0.75} />
+      </mesh>
+    );
+  }
+
+  if (characterId === 'mike') {
+    return (
+      <group>
+        <mesh position={[0, height * 0.56, torsoWidth * 0.32]}>
+          <boxGeometry args={[torsoWidth * 0.9, torsoHeight * 0.68, 0.1]} />
+          <meshStandardMaterial color="#6b4b2b" roughness={0.7} />
+        </mesh>
+        <mesh position={[0, height * 0.69, torsoWidth * 0.36]}>
+          <boxGeometry args={[torsoWidth * 0.36, torsoHeight * 0.2, 0.09]} />
+          <meshStandardMaterial color="#9a7b58" roughness={0.68} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (characterId === 'jessica' || characterId === 'emily') {
+    return (
+      <mesh position={[0, height * 0.6, torsoWidth * 0.34]}>
+        <torusGeometry args={[torsoWidth * 0.28, 0.03, 8, 24]} />
+        <meshStandardMaterial color="#c9a86c" metalness={0.2} roughness={0.45} />
+      </mesh>
+    );
+  }
+
+  if (characterId === 'matt') {
+    return (
+      <group>
+        <mesh position={[0, height * 0.58, -torsoWidth * 0.45]}>
+          <boxGeometry args={[torsoWidth * 1.05, torsoHeight * 0.7, 0.11]} />
+          <meshStandardMaterial color="#1f2b3d" roughness={0.8} />
+        </mesh>
+        <mesh position={[0, height * 0.58, torsoWidth * 0.35]}>
+          <boxGeometry args={[torsoWidth * 0.9, torsoHeight * 0.62, 0.09]} />
+          <meshStandardMaterial color="#2a3e57" roughness={0.78} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (characterId === 'stranger' || characterId === 'hunter') {
+    return (
+      <group>
+        <mesh position={[0, height * 0.59, 0]}>
+          <cylinderGeometry args={[torsoWidth * 0.7, torsoWidth * 1.1, torsoHeight * 0.95, 20]} />
+          <meshStandardMaterial color="#4f463c" roughness={0.92} />
+        </mesh>
+        <mesh position={[0, height * 0.75, torsoWidth * 0.28]}>
+          <boxGeometry args={[torsoWidth * 0.42, torsoHeight * 0.22, 0.08]} />
+          <meshStandardMaterial color="#6f6559" roughness={0.86} />
+        </mesh>
+      </group>
+    );
+  }
+
+  return null;
+}
+
+
+function CharacterSignatureProp({ characterId, torsoWidth, height }: { characterId: string; torsoWidth: number; height: number }) {
+  if (characterId === 'jessica') {
+    return (
+      <mesh position={[torsoWidth * 0.45, height * 0.7, torsoWidth * 0.2]}>
+        <sphereGeometry args={[0.05, 12, 12]} />
+        <meshStandardMaterial color="#d6d6d6" metalness={0.8} roughness={0.25} />
+      </mesh>
+    );
+  }
+
+  if (characterId === 'emily') {
+    return (
+      <mesh position={[-torsoWidth * 0.4, height * 0.66, torsoWidth * 0.15]}>
+        <boxGeometry args={[0.13, 0.08, 0.04]} />
+        <meshStandardMaterial color="#8d1f2d" roughness={0.62} />
+      </mesh>
+    );
+  }
+
+  if (characterId === 'josh') {
+    return (
+      <mesh position={[0, height * 0.78, torsoWidth * 0.22]} rotation={[0.2, 0, 0]}>
+        <cylinderGeometry args={[0.04, 0.045, 0.1, 12]} />
+        <meshStandardMaterial color="#c9a86c" roughness={0.9} />
+      </mesh>
+    );
+  }
+
+  if (characterId === 'sam') {
+    return (
+      <mesh position={[0, height * 0.73, torsoWidth * 0.38]}>
+        <boxGeometry args={[0.14, 0.04, 0.05]} />
+        <meshStandardMaterial color="#93a9c7" roughness={0.65} />
+      </mesh>
+    );
+  }
+
+  return null;
+}
+
 export default function Character({ characterId }: CharacterProps) {
   const groupRef = useRef<THREE.Group>(null);
   const leftArmRef = useRef<THREE.Group>(null);
@@ -386,11 +542,22 @@ export default function Character({ characterId }: CharacterProps) {
         <CharacterFace characterId={characterId} />
       </group>
 
+      <CharacterAccessory characterId={characterId} headY={headY} />
+
       {/* Torso */}
       <mesh castShadow position={[0, profile.height * 0.55, 0]}>
         <capsuleGeometry args={[torsoWidth * 0.5, torsoHeight, 8, 16]} />
         {clothingMat}
       </mesh>
+
+      <CharacterOutfitDetail
+        characterId={characterId}
+        torsoWidth={torsoWidth}
+        torsoHeight={torsoHeight}
+        height={profile.height}
+      />
+
+      <CharacterSignatureProp characterId={characterId} torsoWidth={torsoWidth} height={profile.height} />
 
       {/* Arms with segments */}
       <group position={[-torsoWidth * 0.7, profile.height * 0.68, 0]} ref={leftArmRef}>

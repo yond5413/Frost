@@ -17,10 +17,12 @@ export const characters: Record<string, Character> = {
   matt:    { id: 'matt',    name: 'Matt',    color: '#fb923c', borderColor: '#f97316', spawnPosition: [-3, 0, -2] },
   hannah:  { id: 'hannah',  name: 'Hannah',  color: '#38bdf8', borderColor: '#0ea5e9', spawnPosition: [0, 0, 0] },
   beth:    { id: 'beth',    name: 'Beth',    color: '#818cf8', borderColor: '#6366f1', spawnPosition: [0, 0, 0] },
+  stranger: { id: 'stranger', name: 'Hunter', color: '#a3a3a3', borderColor: '#737373', spawnPosition: [1, 0, 2] },
   narrator: { id: 'narrator', name: 'Narrator', color: '#9ca3af', borderColor: '#6b7280', spawnPosition: [0, 0, 0] },
 };
 
 export const getCharacter = (id: string): Character => {
+  if (id === 'hunter') return characters.stranger;
   return characters[id] || characters.narrator;
 };
 
