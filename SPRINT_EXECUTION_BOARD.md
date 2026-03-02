@@ -13,10 +13,10 @@
 
 ## P1 (Systemic consequences)
 - [x] Story memory persistence + telemetry summaries in ending screens
-- [ ] Convert butterfly entries from abstract text into tagged cause/effect cards
+- [x] Convert butterfly entries from abstract text into tagged cause/effect cards
 - [ ] Add 2+ lock-in consequences resolved later in chapter flow
 
 ## P2 (Operational hardening)
 - [x] Story graph integrity check script
-- [ ] Add automated smoke for deterministic + aiDriven path progression
+- [x] Add automated smoke for deterministic + aiDriven path progression
 - [ ] Add one-click demo seed mode for stable judge run

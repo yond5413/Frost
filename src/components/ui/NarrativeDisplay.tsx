@@ -472,6 +472,11 @@ export default function NarrativeDisplay() {
 
   const handleChoiceSelect = (choice: Choice) => {
     recordRuntimeDecision(scene.aiDriven ? 'ai' : 'deterministic', `choice_selected:${choice.id}`);
+    addStoryMemory({
+      choiceId: choice.id,
+      sceneId: currentScene,
+      consequence: choice.consequence || `Route selected → ${choice.nextScene}`,
+    });
     logRuntimeInfo('player_choice_selected', {
       sceneId: currentScene,
       phase,
