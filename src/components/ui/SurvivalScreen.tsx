@@ -4,7 +4,7 @@ import { useGameStore } from '@/lib/store';
 import { getCharacter } from '@/data/characters';
 
 export default function SurvivalScreen() {
-  const { phase, characterStates, fearLevel, storyMemory, resetGame } = useGameStore();
+  const { phase, characterStates, fearLevel, storyMemory, resetGame, runtimeTelemetry } = useGameStore();
 
   const deaths = useGameStore.getState().consequences.filter((c) => c.startsWith('death_'));
 
@@ -55,6 +55,17 @@ export default function SurvivalScreen() {
             className="h-px bg-gradient-to-r from-emerald-700 to-emerald-500 transition-all duration-1000"
             style={{ width: `${fearLevel}%` }}
           />
+        </div>
+      </div>
+
+
+      <div className="w-full max-w-lg mb-6">
+        <p className="text-[10px] uppercase tracking-[0.4em] text-gray-700 mb-3">Director Summary</p>
+        <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+          <div className="border border-white/10 px-2 py-1 text-gray-400">AI decisions: <span className="text-gray-200">{runtimeTelemetry.aiDecisions}</span></div>
+          <div className="border border-white/10 px-2 py-1 text-gray-400">Deterministic: <span className="text-gray-200">{runtimeTelemetry.deterministicTransitions}</span></div>
+          <div className="border border-white/10 px-2 py-1 text-gray-400">Fallbacks: <span className="text-gray-200">{runtimeTelemetry.aiFallbacks}</span></div>
+          <div className="border border-white/10 px-2 py-1 text-gray-400">Timeouts: <span className="text-gray-200">{runtimeTelemetry.aiTimeouts}</span></div>
         </div>
       </div>
 

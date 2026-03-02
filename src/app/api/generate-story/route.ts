@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logRuntimeInfo, logRuntimeWarn, logRuntimeError } from '@/lib/runtimeLogger';
 
 // Fallback scenes for when AI is unavailable
 const FALLBACK_SCENES = [
@@ -130,10 +131,32 @@ export async function POST(request: Request) {
   // Director mode: availableRoutes provided and non-empty
   const isDirectorMode = Array.isArray(availableRoutes) && availableRoutes.length > 0;
 
+  logRuntimeInfo('story_api_request_received', {
+    sceneId: currentScene,
+    source: 'generate-story-route',
+    mode: isDirectorMode ? 'ai' : 'deterministic',
+    details: {
+      hasApiKey: Boolean(apiKey),
+      fearLevel: fearLevel ?? 0,
+      availableRouteCount: Array.isArray(availableRoutes) ? availableRoutes.length : 0,
+      storyMemoryEntries: Array.isArray(storyMemory) ? storyMemory.length : 0,
+    },
+  });
+
   if (!apiKey) {
     if (isDirectorMode) {
+      logRuntimeWarn('story_api_missing_key_director_fallback', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: 'ai',
+      });
       return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
     }
+    logRuntimeWarn('story_api_missing_key_narrator_fallback', {
+      sceneId: currentScene,
+      source: 'generate-story-route',
+      mode: 'deterministic',
+    });
     return NextResponse.json(getFallback(fearLevel ?? 0));
   }
 
@@ -320,6 +343,12 @@ Respond ONLY in this exact JSON format:
     });
 
     if (!response.ok) {
+      logRuntimeWarn('story_api_upstream_non_ok', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: isDirectorMode ? 'ai' : 'deterministic',
+        details: { status: response.status },
+      });
       console.error(`Mistral API error: ${response.status}`);
       if (isDirectorMode) return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
       return NextResponse.json(getFallback(fearLevel ?? 0));
@@ -329,6 +358,11 @@ Respond ONLY in this exact JSON format:
     const rawContent = data?.choices?.[0]?.message?.content;
 
     if (typeof rawContent !== 'string') {
+      logRuntimeWarn('story_api_invalid_content_payload', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: isDirectorMode ? 'ai' : 'deterministic',
+      });
       console.error('Mistral API returned invalid content payload');
       if (isDirectorMode) return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
       return NextResponse.json(getFallback(fearLevel ?? 0));
@@ -338,6 +372,11 @@ Respond ONLY in this exact JSON format:
     try {
       content = JSON.parse(rawContent);
     } catch (parseErr) {
+      logRuntimeWarn('story_api_json_parse_failure', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: isDirectorMode ? 'ai' : 'deterministic',
+      });
       console.error('Failed to parse Mistral JSON response:', parseErr);
       if (isDirectorMode) return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
       return NextResponse.json(getFallback(fearLevel ?? 0));
@@ -345,19 +384,45 @@ Respond ONLY in this exact JSON format:
 
     if (isDirectorMode) {
       if (!isDirectorModeResponse(content)) {
+        logRuntimeWarn('story_api_invalid_director_shape', {
+          sceneId: currentScene,
+          source: 'generate-story-route',
+          mode: 'ai',
+        });
         console.error('Invalid director response shape from Mistral');
         return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
       }
+      logRuntimeInfo('story_api_director_response_ok', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: 'ai',
+        details: { chosenRoute: content.chosenRoute },
+      });
       return NextResponse.json(content);
     }
 
     if (!isNarratorModeResponse(content)) {
+      logRuntimeWarn('story_api_invalid_narrator_shape', {
+        sceneId: currentScene,
+        source: 'generate-story-route',
+        mode: 'deterministic',
+      });
       console.error('Invalid narrator response shape from Mistral');
       return NextResponse.json(getFallback(fearLevel ?? 0));
     }
 
+    logRuntimeInfo('story_api_narrator_response_ok', {
+      sceneId: currentScene,
+      source: 'generate-story-route',
+      mode: 'deterministic',
+    });
     return NextResponse.json(content);
   } catch (err) {
+    logRuntimeError('story_api_request_failed', {
+      sceneId: currentScene,
+      source: 'generate-story-route',
+      mode: isDirectorMode ? 'ai' : 'deterministic',
+    });
     console.error('Story generation failed:', err);
     if (isDirectorMode) return NextResponse.json(getDirectorFallback(availableRoutes, fearLevel ?? 0));
     return NextResponse.json(getFallback(fearLevel ?? 0));

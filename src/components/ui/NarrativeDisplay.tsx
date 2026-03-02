@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore, Choice } from '@/lib/store';
 import { getScene } from '@/data/story';
 import { useMistralAI } from '@/lib/mistral';
+import { logRuntimeInfo, logRuntimeWarn, logRuntimeError } from '@/lib/runtimeLogger';
 
 import CharacterPortrait from './CharacterPortrait';
 import ConsequencePopup from './ConsequencePopup';
@@ -28,6 +29,7 @@ export default function NarrativeDisplay() {
     setCurrentSpeaker, setCurrentCameraShot,
     setCharacterAnimation,
     conversationHistory, addToConversationHistory, addStoryMemory, setAiServiceStatus, aiServiceStatus,
+    recordRuntimeDecision, recordAiFallback,
     storyMemory,
     narratorPersonality, behavioralProfile, updateBehavioralProfile,
   } = useGameStore();
@@ -188,15 +190,46 @@ export default function NarrativeDisplay() {
     if (scene.fearReset) setFearLevel(0);
     if (scene.environment) setCurrentEnvironment(scene.environment);
 
+    logRuntimeInfo('scene_enter', {
+      sceneId: currentScene,
+      phase,
+      source: 'NarrativeDisplay',
+      mode: scene.aiDriven ? 'ai' : 'deterministic',
+      details: {
+        hasChoices: Boolean(scene.choices?.length),
+        hasInteractables: Boolean(scene.interactables?.length),
+      },
+    });
+
+    recordRuntimeDecision(scene.aiDriven ? 'ai' : 'deterministic', scene.aiDriven ? 'scene_enter_ai' : 'scene_enter_deterministic');
+
     const dialogueLine = scene.dialogue[0];
     if (!dialogueLine) {
       if (scene.choices && scene.choices.length > 0) {
+        logRuntimeInfo('scene_no_dialogue_show_choices', {
+          sceneId: currentScene,
+          phase,
+          source: 'NarrativeDisplay',
+          mode: 'deterministic',
+        });
         setShowChoices(true);
       }
       return;
     }
 
     if (scene.aiDriven) {
+      logRuntimeInfo('ai_decision_start', {
+        sceneId: currentScene,
+        phase,
+        source: 'NarrativeDisplay',
+        mode: 'ai',
+        details: {
+          availableRouteCount: (scene.choices || []).length,
+          storyMemoryEntries: storyMemory.length,
+          aiServiceStatus,
+        },
+      });
+
       setIsGeneratingAI(true);
       addToConversationHistory('user', `Scene: ${currentScene}`);
 
@@ -210,6 +243,18 @@ export default function NarrativeDisplay() {
 
       // 10-second timeout — fall back to static dialogue if AI is too slow
       aiTimeoutRef.current = setTimeout(() => {
+        recordAiFallback('timeout_static_dialogue', true);
+        logRuntimeWarn('ai_decision_timeout_fallback', {
+          sceneId: currentScene,
+          phase,
+          source: 'NarrativeDisplay',
+          mode: 'ai',
+          details: {
+            timeoutMs: 10000,
+            fallbackRoute: availableRoutes[0]?.nextScene ?? null,
+          },
+        });
+
         setIsGeneratingAI(false);
         setAiServiceStatus('degraded');
         if (availableRoutes.length > 0) {
@@ -237,6 +282,19 @@ export default function NarrativeDisplay() {
           if (aiTimeoutRef.current) { clearTimeout(aiTimeoutRef.current); aiTimeoutRef.current = null; }
           setIsGeneratingAI(false);
           if (result) {
+            recordRuntimeDecision('ai', result.chosenRoute ? 'ai_route_selected' : 'ai_narration_generated');
+            logRuntimeInfo('ai_decision_success', {
+              sceneId: currentScene,
+              phase,
+              source: 'NarrativeDisplay',
+              mode: 'ai',
+              details: {
+                chosenRoute: result.chosenRoute ?? null,
+                hasChoices: Boolean(result.choices?.length),
+                fearDelta: result.fearDelta ?? 0,
+              },
+            });
+
             setAiServiceStatus('healthy');
             addToConversationHistory('assistant', result.narratorText || '');
 
@@ -300,6 +358,17 @@ export default function NarrativeDisplay() {
               }
             }
           } else {
+            recordAiFallback('empty_ai_result');
+            logRuntimeWarn('ai_decision_empty_result_fallback', {
+              sceneId: currentScene,
+              phase,
+              source: 'NarrativeDisplay',
+              mode: 'ai',
+              details: {
+                fallbackRoute: availableRoutes[0]?.nextScene ?? null,
+              },
+            });
+
             setAiServiceStatus('degraded');
             // Fallback: use first available route
             if (availableRoutes.length > 0) {
@@ -309,6 +378,17 @@ export default function NarrativeDisplay() {
           }
         })
         .catch(() => {
+          recordAiFallback('request_failed');
+          logRuntimeError('ai_decision_request_failed', {
+            sceneId: currentScene,
+            phase,
+            source: 'NarrativeDisplay',
+            mode: 'ai',
+            details: {
+              fallbackRoute: (scene.choices || [])[0]?.nextScene ?? null,
+            },
+          });
+
           if (aiTimeoutRef.current) { clearTimeout(aiTimeoutRef.current); aiTimeoutRef.current = null; }
           setIsGeneratingAI(false);
           setAiServiceStatus('offline');
@@ -320,6 +400,18 @@ export default function NarrativeDisplay() {
           startTypewriter(dialogueLine.text || '', 0);
         });
     } else {
+      recordRuntimeDecision('deterministic', 'deterministic_scene_line_start');
+      logRuntimeInfo('deterministic_scene_line_start', {
+        sceneId: currentScene,
+        phase,
+        source: 'NarrativeDisplay',
+        mode: 'deterministic',
+        details: {
+          lineIndex: 0,
+          speaker: dialogueLine.speaker,
+        },
+      });
+
       if (dialogueLine.fearDelta) incrementFear(dialogueLine.fearDelta);
       if (dialogueLine.speaker !== 'narrator') {
         setCharacterAnimation(dialogueLine.speaker, dialogueLine.animation || 'talking');
@@ -371,6 +463,19 @@ export default function NarrativeDisplay() {
   }, []);
 
   const handleChoiceSelect = (choice: Choice) => {
+    recordRuntimeDecision(scene.aiDriven ? 'ai' : 'deterministic', `choice_selected:${choice.id}`);
+    logRuntimeInfo('player_choice_selected', {
+      sceneId: currentScene,
+      phase,
+      source: 'NarrativeDisplay',
+      mode: scene.aiDriven ? 'ai' : 'deterministic',
+      details: {
+        choiceId: choice.id,
+        nextScene: choice.nextScene,
+        fearDelta: choice.fearDelta ?? 0,
+      },
+    });
+
     makeChoice(choice.id);
     if (choice.consequence) addConsequence(choice.consequence);
 

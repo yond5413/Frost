@@ -4,7 +4,7 @@ import { useGameStore } from '@/lib/store';
 import CharacterRoster from './CharacterRoster';
 
 export default function GameHUD() {
-  const { clues, fearLevel, phase, togglePause } = useGameStore();
+  const { clues, fearLevel, phase, togglePause, runtimeTelemetry, aiServiceStatus } = useGameStore();
 
   const fearBarColor =
     fearLevel > 70
@@ -15,6 +15,10 @@ export default function GameHUD() {
 
   const fearBarGlow =
     fearLevel > 70 ? '0 0 6px rgba(220,38,38,0.5)' : 'none';
+
+  const decisionModeLabel = runtimeTelemetry.lastDecisionMode === 'ai' ? 'AI DIRECTOR' : 'DETERMINISTIC';
+  const decisionModeClass = runtimeTelemetry.lastDecisionMode === 'ai' ? 'text-cyan-300 border-cyan-700/40' : 'text-gray-300 border-gray-700/40';
+  const aiStatusDotClass = aiServiceStatus === 'healthy' ? 'bg-emerald-500' : aiServiceStatus === 'degraded' ? 'bg-yellow-500' : 'bg-red-500';
 
   return (
     <div className="absolute top-4 left-4 right-4 flex flex-col gap-2 pointer-events-none z-10">
@@ -30,6 +34,10 @@ export default function GameHUD() {
           {/* Pause button and hint */}
           {(phase === 'scene' || phase === 'choice' || phase === 'exploration') && (
             <div className="flex items-center gap-2">
+              <div className={`pointer-events-none text-[10px] font-mono px-2 py-1 border ${decisionModeClass} bg-black/40 flex items-center gap-1.5`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${aiStatusDotClass}`} />
+                <span>{decisionModeLabel}</span>
+              </div>
               <button
                 onClick={togglePause}
                 className="pointer-events-auto text-xs font-mono px-2 py-1 border border-white/10 text-gray-600 hover:text-gray-400 hover:border-white/20 transition-all"
@@ -57,8 +65,6 @@ export default function GameHUD() {
               </div>
             </div>
           )}
-
-
         </div>
       </div>
     </div>

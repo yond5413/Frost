@@ -18,6 +18,7 @@ import CharacterDeathEffects from '@/components/ui/CharacterDeathEffects';
  import DeathRecap from '@/components/ui/DeathRecap';
  import SurvivalScreen from '@/components/ui/SurvivalScreen';
 import PauseMenu from '@/components/ui/PauseMenu';
+import DirectorStateOverlay from '@/components/ui/DirectorStateOverlay';
 import { useMusicSync } from '@/lib/musicManager';
 import { NarratorPersonality } from '@/lib/store';
 
@@ -112,6 +113,7 @@ export default function GamePage() {
       />
 
       <GameHUD />
+      <DirectorStateOverlay />
 
       {phase === 'intro' && (
         <div className="absolute inset-0 z-40 overflow-hidden flex flex-col items-center justify-center">

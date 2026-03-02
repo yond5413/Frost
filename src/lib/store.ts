@@ -87,6 +87,17 @@ export interface ConversationMessage {
   content: string;
 }
 
+export type RuntimeDecisionMode = 'deterministic' | 'ai';
+
+export interface RuntimeTelemetry {
+  aiDecisions: number;
+  deterministicTransitions: number;
+  aiFallbacks: number;
+  aiTimeouts: number;
+  lastDecisionMode: RuntimeDecisionMode;
+  lastDecisionReason: string;
+}
+
 interface GameState {
   phase: GamePhase;
   currentScene: string;
@@ -111,6 +122,8 @@ interface GameState {
   conversationHistory: ConversationMessage[];
   storyMemory: StoryMemoryEntry[];
   aiServiceStatus: 'healthy' | 'degraded' | 'offline';
+  runtimeTelemetry: RuntimeTelemetry;
+  isDirectorOverlayOpen: boolean;
   // Inventory
   inventory: InventoryItem[];
   // Narrator personality
@@ -163,6 +176,9 @@ interface GameState {
   addToConversationHistory: (role: 'user' | 'assistant', content: string) => void;
   addStoryMemory: (entry: StoryMemoryEntry) => void;
   setAiServiceStatus: (status: 'healthy' | 'degraded' | 'offline') => void;
+  recordRuntimeDecision: (mode: RuntimeDecisionMode, reason: string) => void;
+  recordAiFallback: (reason: string, isTimeout?: boolean) => void;
+  toggleDirectorOverlay: () => void;
 
   // Inventory
   addItem: (item: InventoryItem) => void;
@@ -249,6 +265,15 @@ const initialState = {
   conversationHistory: [],
   storyMemory: [],
   aiServiceStatus: 'healthy' as const,
+  runtimeTelemetry: {
+    aiDecisions: 0,
+    deterministicTransitions: 0,
+    aiFallbacks: 0,
+    aiTimeouts: 0,
+    lastDecisionMode: 'deterministic' as RuntimeDecisionMode,
+    lastDecisionReason: 'game_start',
+  } as RuntimeTelemetry,
+  isDirectorOverlayOpen: false,
   inventory: [],
   narratorPersonality: 'balanced' as NarratorPersonality,
   behavioralProfile: {
@@ -410,6 +435,28 @@ export const useGameStore = create<GameState>()(persist((set, get) => ({
 
   setAiServiceStatus: (status) => set({ aiServiceStatus: status }),
 
+  recordRuntimeDecision: (mode, reason) => set((state) => ({
+    runtimeTelemetry: {
+      ...state.runtimeTelemetry,
+      aiDecisions: state.runtimeTelemetry.aiDecisions + (mode === 'ai' ? 1 : 0),
+      deterministicTransitions: state.runtimeTelemetry.deterministicTransitions + (mode === 'deterministic' ? 1 : 0),
+      lastDecisionMode: mode,
+      lastDecisionReason: reason,
+    },
+  })),
+
+  recordAiFallback: (reason, isTimeout = false) => set((state) => ({
+    runtimeTelemetry: {
+      ...state.runtimeTelemetry,
+      aiFallbacks: state.runtimeTelemetry.aiFallbacks + 1,
+      aiTimeouts: state.runtimeTelemetry.aiTimeouts + (isTimeout ? 1 : 0),
+      lastDecisionMode: 'ai',
+      lastDecisionReason: reason,
+    },
+  })),
+
+  toggleDirectorOverlay: () => set((state) => ({ isDirectorOverlayOpen: !state.isDirectorOverlayOpen })),
+
   addItem: (item) => set((state) => ({
     inventory: [...state.inventory, item],
   })),
@@ -447,5 +494,6 @@ export const useGameStore = create<GameState>()(persist((set, get) => ({
      relationships: state.relationships,
      narratorPersonality: state.narratorPersonality,
      behavioralProfile: state.behavioralProfile,
+     runtimeTelemetry: state.runtimeTelemetry,
    }),
 }));
